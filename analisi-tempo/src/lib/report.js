@@ -377,3 +377,34 @@ export function frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra }) 
   }
   return frasi.slice(0, 4)
 }
+
+// ---- Le tue ore migliori (Loehr & Schwartz: gestire l'energia) -------------
+
+/**
+ * Energia media (1..3) per ora del giorno, pesata sui minuti, e la fascia
+ * di 2 ore consecutive con l'energia più alta (minimo 2 registrazioni per ora).
+ */
+export function oreMigliori(righe) {
+  const perOra = Array.from({ length: 24 }, () => ({ minuti: 0, somma: 0, conteggio: 0 }))
+  for (const r of righe) {
+    if (r.energia == null) continue
+    const h = new Date(r.ora_inizio).getHours()
+    perOra[h].minuti += r.minuti
+    perOra[h].somma += r.energia * r.minuti
+    perOra[h].conteggio++
+  }
+  const ore = perOra.map((o, h) => ({
+    ora: h,
+    media: o.conteggio >= 2 ? o.somma / o.minuti : null,
+    conteggio: o.conteggio,
+  }))
+  let migliore = null
+  for (let h = 0; h < 23; h++) {
+    const a = ore[h].media
+    const b = ore[h + 1].media
+    if (a == null || b == null) continue
+    const m = (a + b) / 2
+    if (!migliore || m > migliore.media) migliore = { da: h, a: h + 2, media: m }
+  }
+  return { ore: ore.filter((o) => o.media != null), migliore }
+}

@@ -23,6 +23,7 @@ import {
   bolleMappa,
   concentrazione,
   frasiChiave,
+  oreMigliori,
 } from '../lib/report.js'
 import { posizione } from '../lib/mappa.js'
 import { csvRiepilogo, csvDettaglio, pdfReport, condividiOScarica, nomeFile } from '../lib/esporta.js'
@@ -64,6 +65,7 @@ export default function Report() {
   const allin = allineamentoObiettivo(dati.righe, stato.categorie)
   const bolle = bolleMappa(dati.righe, stato.categorie)
   const conc = concentrazione(dati.righe, stato.categorie)
+  const energia = oreMigliori(dati.righe)
   const valoreOra = stato.impostazioni?.valore_ora ? Number(stato.impostazioni.valore_ora) : null
   const frasi = frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra })
 
@@ -205,6 +207,7 @@ export default function Report() {
       {svr && <StimaVsReale svr={svr} stato={stato} />}
       <Delegabili deleg={deleg} r={r} valoreOra={valoreOra} />
       <Concentrazione c={conc} />
+      <OreMigliori e={energia} />
       <MappaBolle bolle={bolle} />
       <UrgenteImportante m={matrice} />
       <Allineamento a={allin} obiettivo={stato.impostazioni?.obiettivo} />
@@ -501,6 +504,37 @@ function Concentrazione({ c }) {
         {c.oreRegistrate} ore registrate, {percento((c.pulite / c.oreRegistrate) * 100)} sono state
         dedicate a una sola attività.
       </p>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
+// LE TUE ORE MIGLIORI: energia media per ora del giorno
+// ---------------------------------------------------------------------
+function OreMigliori({ e }) {
+  if (!e.ore.length) return null
+  const due = (h) => `${String(h % 24).padStart(2, '0')}:00`
+  return (
+    <section className="sezione-report">
+      <h2>Le tue ore migliori</h2>
+      {e.migliore && (
+        <p>
+          Energia più alta tra le <b>{due(e.migliore.da)}</b> e le <b>{due(e.migliore.a)}</b>:
+          proteggi questa fascia per il lavoro autonomo.
+        </p>
+      )}
+      <div className="grafico-energia">
+        {e.ore.map((o) => (
+          <div key={o.ora} className="colonna-energia" title={`${due(o.ora)}: ${o.media.toFixed(1)}`}>
+            <span
+              className={'barra-energia' + (e.migliore && o.ora >= e.migliore.da && o.ora < e.migliore.a ? ' top' : '')}
+              style={{ height: `${(o.media / 3) * 100}%` }}
+            />
+            <small>{o.ora}</small>
+          </div>
+        ))}
+      </div>
+      <p className="piccolo">Energia media (da 1 a 3) che hai segnato per ogni ora del giorno.</p>
     </section>
   )
 }

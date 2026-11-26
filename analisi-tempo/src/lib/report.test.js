@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   periodo, spostaPeriodo, riepilogo, oreFascia, fattoreProiezione, copertura, ore,
   stimaVsReale, delegabili, conSegno, matriceUrgenteImportante, allineamentoObiettivo, bolleMappa,
-  concentrazione, frasiChiave,
+  concentrazione, frasiChiave, oreMigliori,
 } from './report.js'
 
 const fascia = Object.fromEntries(
@@ -219,5 +219,22 @@ describe('concentrazione e frasi chiave', () => {
     expect(f[1]).toContain('Ore delegabili: 1,3 h')
     expect(f[1]).toContain('80') // 1,33 h × 60 € = 80 €
     expect(f[2]).toContain('Blocchi di lavoro autonomo da 2+ ore: 1')
+  })
+})
+
+describe('ore migliori', () => {
+  const h = (g, ora) => new Date(2026, 10, g, ora).toISOString()
+  it('trova la fascia di 2 ore con più energia', () => {
+    const righe = []
+    for (const g of [24, 25]) {
+      righe.push({ ora_inizio: h(g, 6), minuti: 60, energia: 3 })
+      righe.push({ ora_inizio: h(g, 7), minuti: 60, energia: 3 })
+      righe.push({ ora_inizio: h(g, 14), minuti: 60, energia: 1 })
+      righe.push({ ora_inizio: h(g, 15), minuti: 60, energia: 2 })
+    }
+    righe.push({ ora_inizio: h(24, 20), minuti: 60, energia: 3 }) // una sola volta: ignorata
+    const o = oreMigliori(righe)
+    expect(o.migliore).toEqual({ da: 6, a: 8, media: 3 })
+    expect(o.ore.map((x) => x.ora)).toEqual([6, 7, 14, 15])
   })
 })
