@@ -191,6 +191,25 @@ function ModificaCategoria({ categoria: c, stato, esegui }) {
           }
         />
       </label>
+      {c.lavoro && (
+        <div className="riga-dettaglio">
+          <span>Ore stimate al mese</span>
+          <input
+            className="input-corto"
+            inputMode="decimal"
+            placeholder="–"
+            defaultValue={c.ore_stimate_mese == null ? '' : Number(c.ore_stimate_mese)}
+            onBlur={(e) => {
+              const t = e.target.value.trim().replace(',', '.')
+              const v = t === '' ? null : Number(t)
+              if (v != null && (Number.isNaN(v) || v < 0)) return
+              if (v !== (c.ore_stimate_mese == null ? null : Number(c.ore_stimate_mese))) {
+                aggiorna({ ore_stimate_mese: v })
+              }
+            }}
+          />
+        </div>
+      )}
       <div className="riga-dettaglio">
         <span>Colore</span>
         <input type="color" value={c.colore} onChange={(e) => aggiorna({ colore: e.target.value })} />

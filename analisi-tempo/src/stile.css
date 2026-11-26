@@ -285,3 +285,36 @@ small { color: var(--tenue); }
 }
 @media (prefers-color-scheme: dark) { .invito { background: #3a2f12; color: #f5dea0; } }
 .chiave { display: block; word-break: break-all; font-size: .85rem; padding: 8px; background: var(--sfondo); border-radius: 8px; margin: 6px 0; }
+
+/* ---- Report ---- */
+.schede { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin-bottom: 12px; background: var(--bordo); border-radius: 12px; }
+.schede button { border: 0; background: none; padding: 8px; border-radius: 9px; font-weight: 600; color: var(--tenue); }
+.schede button.scelta { background: var(--carta); color: var(--testo); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.etichetta-periodo { text-transform: capitalize; text-align: center; }
+.tabella-corso { width: 100%; border-collapse: collapse; background: var(--carta); border-radius: var(--raggio); overflow: hidden; font-size: .92rem; margin: 6px 0 16px; }
+.tabella-corso th, .tabella-corso td { padding: 9px 8px; border-bottom: 1px solid var(--bordo); text-align: left; vertical-align: middle; }
+.tabella-corso thead th { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--tenue); }
+.tabella-corso .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabella-corso tfoot th { font-weight: 700; border-top: 2px solid var(--testo); }
+.tabella-corso .pallino { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: 1px; }
+.tabella-corso .cliccabile { cursor: pointer; }
+.riga-sotto-report td { padding-left: 34px; color: var(--tenue); font-size: .85rem; }
+.riga-esclusa td { color: var(--tenue); }
+.titolo-grafico { margin-top: 4px; }
+.grafico { display: flex; flex-direction: column; gap: 10px; }
+.barra-riga { display: flex; flex-direction: column; gap: 3px; }
+.barra-nome { font-size: .85rem; }
+.barra-pista { display: flex; align-items: center; gap: 8px; }
+.barra { height: 18px; min-width: 3px; border-radius: 5px; background: var(--colore); }
+.barra-valore { font-size: .8rem; color: var(--tenue); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sezione-report { margin-top: 22px; }
+.testa-sezione { display: flex; align-items: baseline; justify-content: space-between; }
+.tabella-corso td.scostato, .tabella-corso th.scostato { color: #b45309; font-weight: 700; }
+.numero-grande { font-size: 1.6rem; font-weight: 700; margin-bottom: 8px; }
+.numero-grande small { font-size: .9rem; font-weight: 400; }
+.riga-stima { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--bordo); }
+.riga-stima input { width: 90px; text-align: right; }
+.riga-stima .pallino { display: inline-block; width: 10px; height: 10px; }
+.bottoni-export { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bottoni-export .primario { grid-column: 1 / -1; }
+.input-corto { width: 90px; text-align: right; }

@@ -230,3 +230,39 @@ export async function scaricaConfigurazione() {
   stato.impostazioni = imp.data
   notifica()
 }
+
+/**
+ * Registrazioni di un periodo per i report.
+ * Con la rete le prende dal database; senza, usa quelle sul telefono.
+ * In entrambi i casi applica le modifiche non ancora inviate.
+ * Restituisce { righe, daTelefono } (daTelefono = true se offline).
+ */
+export async function caricaPeriodo(da, a) {
+  let righe = null
+  let daTelefono = false
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('registrazioni')
+      .select('id, ora_inizio, minuti, categoria_id, sottocategoria_id, delegabile, energia, nota')
+      .gte('ora_inizio', da.toISOString())
+      .lt('ora_inizio', a.toISOString())
+      .order('ora_inizio')
+      .limit(5000)
+    if (!error) righe = data
+  }
+  if (!righe) {
+    daTelefono = true
+    righe = Object.entries(stato.voci).flatMap(([k, voci]) =>
+      voci.map((v) => ({ ...v, ora_inizio: k })),
+    )
+  }
+  // le ore modificate ma non ancora inviate vincono su quelle del server
+  const inCoda = new Map(stato.coda.map((o) => [o.chiave, o.voci]))
+  righe = righe.filter((r) => !inCoda.has(new Date(r.ora_inizio).toISOString()))
+  for (const [k, voci] of inCoda) righe.push(...voci.map((v) => ({ ...v, ora_inizio: k })))
+  righe = righe.filter((r) => {
+    const t = new Date(r.ora_inizio).getTime()
+    return t >= da.getTime() && t < a.getTime()
+  })
+  return { righe, daTelefono }
+}

@@ -10,8 +10,8 @@ dove va davvero il tuo tempo.
 |---|---|---|
 | 1 | Database, login, registrazione rapida, timeline, uso offline | ✅ pronta |
 | 2 | App installabile (PWA) e notifiche orarie | ✅ pronta |
-| 3 | Report giorno / settimana / mese | da fare |
-| 4 | Stima vs Reale, ore delegabili, export CSV e PDF | da fare |
+| 3 | Report giorno / settimana / mese | ✅ pronta |
+| 4 | Stima vs Reale, ore delegabili, export CSV e PDF | ✅ pronta |
 
 ---
 
@@ -57,6 +57,8 @@ Servono circa 20 minuti, dal computer. Entrambi i servizi sono gratuiti per ques
 2. Apri il file `supabase/migrations/20261126000001_schema_iniziale.sql`, copia **tutto** il
    contenuto, incollalo e premi **Run**.
 3. Deve comparire *"Success. No rows returned"*.
+4. Ripeti con `supabase/migrations/20261126000003_stime.sql`, che contiene le tue ore
+   stimate. La migrazione `…0002_notifiche.sql` si esegue più avanti, al passo 8.
 
 > Le migrazioni vanno eseguite **in ordine di numero**, una volta sola ciascuna. Le prossime
 > fasi aggiungeranno altri file in questa cartella.
@@ -222,8 +224,43 @@ Con le frecce ‹ › cambi giorno.
   se conta come lavoro, per nasconderla o per gestire le sottocategorie. Le categorie non
   si cancellano, si nascondono, così i report passati restano corretti.
 
+**Report** (Giorno / Settimana / Mese, con ‹ › per cambiare periodo)
+- In alto: ore di lavoro, **% di ore compilate** (quante ore della fascia hai registrato) e,
+  nel mese in corso, la **proiezione a fine mese**.
+- **Tabella del corso**: Attività | Ore-mese | %. La % è sul totale lavoro, quindi
+  "Pausa / personale" è esclusa. Tocca una categoria con ▸ per vedere le sottocategorie.
+- **Grafico** a barre con i colori delle categorie.
+- **Stima vs Reale** (solo vista Mese). Stima, reale e scostamento. Nel mese in corso il
+  confronto è con la proiezione, altrimenti a metà mese sembrerebbe tutto "sotto stima". In
+  arancione le attività che si discostano di più del 25%. Le stime si cambiano con
+  **Modifica stime** o in Impostazioni → Categorie.
+- **Ore delegabili**: totale, % del lavoro e dettaglio per categoria. Indica anche per quante
+  ore hai risposto alla domanda, così sai quanto è affidabile il dato.
+- **Condividi con il coach**: **PDF** (tabella del corso, stima vs reale, delegabili,
+  grafico), **CSV riepilogo** (lo stesso formato per Excel/Numbers) e **CSV dettaglio ore**
+  (una riga per ogni ora registrata). Sull'iPhone si apre il menu Condividi (Mail,
+  WhatsApp, File…). Sul computer il file viene scaricato.
+
+**Come si calcola la proiezione**: le ore registrate finora × (ore di fascia del mese ÷ ore di
+fascia già trascorse). Se lasci molte ore vuote, la proiezione viene più bassa del reale: per
+questo in alto vedi la % di ore compilate.
+
 **Notifiche** (Impostazioni → 🔔): attiva o disattiva su questo telefono, notifica di prova,
 **pausa notifiche per oggi** (domani ripartono da sole), promemoria orari on/off.
+
+## Aggiornare il database per le fasi 3 e 4
+
+La Fase 3 non cambia il database. Per la Fase 4 esegui nello **SQL Editor** il file
+`supabase/migrations/20261126000003_stime.sql`. Aggiunge le ore stimate e inserisce la tua
+stima: 140, 28, 20, 28, 28, 0, 5, 28 = **277 ore al mese**.
+
+**Ordine delle migrazioni** (ognuna una volta sola):
+
+| File | Fase |
+|---|---|
+| `20261126000001_schema_iniziale.sql` | 1 |
+| `20261126000002_notifiche.sql` | 2 (prima i due segreti nel Vault, passo 8) |
+| `20261126000003_stime.sql` | 4 |
 
 ---
 
@@ -269,6 +306,23 @@ Spunta ogni voce dal telefono:
 - [ ] Se una notifica non arriva: Supabase → **Edge Functions → notifica-oraria → Logs**, e
       in **Integrations → Cron → Jobs** il lavoro `notifica-oraria` con le sue esecuzioni.
 
+## Checklist di prova — Fasi 3 e 4
+
+- [ ] Nel menu in basso c'è **📊 Report**.
+- [ ] Vista **Mese**: la tabella mostra le 8 attività numerate, Ore-mese e %. La somma delle
+      % fa 100. "Pausa / personale" è sotto, segnata "esclusa".
+- [ ] Le ore del report corrispondono a quelle della schermata Giornata (prova su un giorno).
+- [ ] Tocco "4. Supervisione ▸": compaiono Cucina / Sala / Fornitori / Eventi.
+- [ ] **Settimana** parte dal lunedì; **Giorno** mostra lo stesso totale della Giornata.
+- [ ] Mese in corso: in alto c'è "proiezione mese"; nel mese scorso no.
+- [ ] **Stima vs Reale**: il totale delle stime è **277**. Modifico una stima → cambia lo
+      scostamento.
+- [ ] **Ore delegabili**: dopo aver risposto "Sì" a qualche ora, compaiono qui.
+- [ ] **PDF** → si apre Condividi → lo mando a me stesso via Mail e si legge bene.
+- [ ] **CSV riepilogo** → aperto con Numbers/Excel, le colonne sono separate e gli accenti
+      corretti.
+- [ ] Modalità aereo → il report mostra lo stesso i dati recenti, con l'avviso "Offline".
+
 ---
 
 ## Per lo sviluppo (facoltativo)
@@ -289,4 +343,13 @@ public/manifest.webmanifest                    ← nome, icona, avvio a schermo 
 supabase/functions/notifica-oraria/index.ts    ← invio dei push (regole + servizio)
 supabase/migrations/…0002_notifiche.sql        ← tabella iscrizioni + orologio pg_cron
 src/lib/notifiche.js, src/schermate/Notifiche.jsx
+```
+
+Fasi 3 e 4:
+
+```
+src/lib/report.js         ← calcoli: periodi, riepilogo, proiezione, stima vs reale, delegabili
+src/lib/esporta.js        ← CSV (formato Excel italiano) e PDF (jsPDF, caricato solo quando serve)
+src/schermate/Report.jsx
+supabase/migrations/…0003_stime.sql
 ```

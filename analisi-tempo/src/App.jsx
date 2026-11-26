@@ -1,6 +1,6 @@
 // =====================================================================
 // Struttura dell'app: login → (scarica dati) → schermate con menu in basso.
-// Le schermate sono indirizzi veri: /registra, /giornata, /impostazioni.
+// Le schermate sono indirizzi veri: /registra, /giornata, /report, /impostazioni.
 // =====================================================================
 import { useEffect, useState } from 'react'
 import { supabase, configurato } from './lib/supabase.js'
@@ -13,12 +13,14 @@ import Registra from './schermate/Registra.jsx'
 import Giornata from './schermate/Giornata.jsx'
 import Impostazioni from './schermate/Impostazioni.jsx'
 import Notifiche from './schermate/Notifiche.jsx'
+import Report from './schermate/Report.jsx'
 import GeneraChiavi from './schermate/GeneraChiavi.jsx'
 import { riconfermaIscrizione } from './lib/notifiche.js'
 
 const PAGINE = {
   '/registra': { titolo: 'Registra', icona: '⏱️', Componente: Registra },
   '/giornata': { titolo: 'Giornata', icona: '📅', Componente: Giornata },
+  '/report': { titolo: 'Report', icona: '📊', Componente: Report },
   '/impostazioni': { titolo: 'Impostazioni', icona: '⚙️', Componente: Impostazioni },
   // schermata guidata, raggiungibile da Impostazioni (non nel menu)
   '/notifiche': { titolo: 'Notifiche', Componente: Notifiche, nascosta: true },

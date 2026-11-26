@@ -1,0 +1,199 @@
+// =====================================================================
+// Calcoli dei report (funzioni "pure": niente rete, facili da testare).
+// Formato del foglio del corso:  Attività | Ore-mese | %
+// La % è calcolata sul totale delle ore di LAVORO: "Pausa / personale"
+// (e ogni categoria con "conta come lavoro" spento) è esclusa.
+// =====================================================================
+import { inizioGiorno, aggiungiGiorni, inFascia, oreDelGiorno } from './ore.js'
+
+// ---- Periodi --------------------------------------------------------
+
+/** Restituisce { da, a, etichetta } per giorno / settimana / mese. */
+export function periodo(tipo, riferimento) {
+  const r = inizioGiorno(riferimento)
+  if (tipo === 'giorno') {
+    return {
+      da: r,
+      a: aggiungiGiorni(r, 1),
+      etichetta: r.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }),
+    }
+  }
+  if (tipo === 'settimana') {
+    // settimana italiana: da lunedì a domenica
+    const daLunedi = (r.getDay() + 6) % 7
+    const da = aggiungiGiorni(r, -daLunedi)
+    const a = aggiungiGiorni(da, 7)
+    const fmt = (d) => d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })
+    return { da, a, etichetta: `${fmt(da)} – ${fmt(aggiungiGiorni(a, -1))}` }
+  }
+  // mese
+  const da = new Date(r.getFullYear(), r.getMonth(), 1)
+  const a = new Date(r.getFullYear(), r.getMonth() + 1, 1)
+  return { da, a, etichetta: da.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) }
+}
+
+/** Sposta il riferimento di un periodo avanti (+1) o indietro (-1). */
+export function spostaPeriodo(tipo, riferimento, verso) {
+  const r = new Date(riferimento)
+  if (tipo === 'giorno') return aggiungiGiorni(r, verso)
+  if (tipo === 'settimana') return aggiungiGiorni(r, 7 * verso)
+  return new Date(r.getFullYear(), r.getMonth() + verso, 1)
+}
+
+// ---- Riepilogo per categoria ------------------------------------------
+
+/**
+ * @param righe     registrazioni del periodo [{ categoria_id, sottocategoria_id, minuti, delegabile, ... }]
+ * @param categorie tutte le categorie dell'utente (anche nascoste)
+ * @returns {
+ *   righe: [{ categoria, minuti, percentuale, minutiDelegabili, sotto: [{ id, minuti }] }],
+ *   minutiLavoro, minutiNonLavoro, minutiDelegabili
+ * }
+ */
+export function riepilogo(righe, categorie) {
+  const perCategoria = new Map()
+  for (const c of categorie) {
+    perCategoria.set(c.id, { categoria: c, minuti: 0, minutiDelegabili: 0, sotto: new Map() })
+  }
+  for (const r of righe) {
+    const voce = perCategoria.get(r.categoria_id)
+    if (!voce) continue
+    voce.minuti += r.minuti
+    if (r.delegabile === true) voce.minutiDelegabili += r.minuti
+    const chiaveSotto = r.sottocategoria_id ?? 'senza'
+    voce.sotto.set(chiaveSotto, (voce.sotto.get(chiaveSotto) ?? 0) + r.minuti)
+  }
+
+  const tutte = [...perCategoria.values()]
+  const minutiLavoro = tutte.filter((v) => v.categoria.lavoro).reduce((s, v) => s + v.minuti, 0)
+  const minutiNonLavoro = tutte.filter((v) => !v.categoria.lavoro).reduce((s, v) => s + v.minuti, 0)
+  const minutiDelegabili = tutte
+    .filter((v) => v.categoria.lavoro)
+    .reduce((s, v) => s + v.minutiDelegabili, 0)
+
+  const risultato = tutte
+    // le categorie nascoste compaiono solo se hanno ore nel periodo
+    .filter((v) => v.categoria.attiva || v.minuti > 0)
+    .sort((x, y) => x.categoria.ordine - y.categoria.ordine)
+    .map((v) => ({
+      categoria: v.categoria,
+      minuti: v.minuti,
+      minutiDelegabili: v.minutiDelegabili,
+      percentuale: v.categoria.lavoro && minutiLavoro ? (v.minuti / minutiLavoro) * 100 : null,
+      sotto: [...v.sotto.entries()]
+        .map(([id, minuti]) => ({ id: id === 'senza' ? null : id, minuti }))
+        .sort((x, y) => y.minuti - x.minuti),
+    }))
+
+  return { righe: risultato, minutiLavoro, minutiNonLavoro, minutiDelegabili }
+}
+
+// ---- Copertura e proiezione -------------------------------------------
+
+/**
+ * Ore di fascia lavorativa nel periodo [da, a), contando solo quelle già
+ * concluse prima di `fino` (se indicato).
+ */
+export function oreFascia(fascia, da, a, fino = null) {
+  let ore = 0
+  for (let g = new Date(da); g < a; g = aggiungiGiorni(g, 1)) {
+    for (const o of oreDelGiorno(g)) {
+      if (fino && o.getTime() + 3600000 > fino.getTime()) continue
+      if (inFascia(fascia, o)) ore++
+    }
+  }
+  return ore
+}
+
+/**
+ * Proiezione a fine mese: quello che hai registrato finora, riportato
+ * su tutte le ore di fascia del mese.
+ *   proiezione = reale × (ore fascia del mese ÷ ore fascia già trascorse)
+ * Restituisce null se il mese non è quello in corso o se è troppo presto.
+ */
+export function fattoreProiezione(fascia, inizioMese, fineMese, adesso = new Date()) {
+  if (adesso < inizioMese || adesso >= fineMese) return null
+  const trascorse = oreFascia(fascia, inizioMese, fineMese, adesso)
+  const totali = oreFascia(fascia, inizioMese, fineMese)
+  if (trascorse < 8) return null // troppo presto per una stima sensata
+  return totali / trascorse
+}
+
+/** Quante ore di fascia (già concluse) hanno almeno una registrazione. */
+export function copertura(righe, fascia, da, a, adesso = new Date()) {
+  const attese = oreFascia(fascia, da, a, adesso)
+  if (!attese) return null
+  const oreConDati = new Set(righe.map((r) => new Date(r.ora_inizio).getTime()))
+  let compilate = 0
+  for (const t of oreConDati) if (inFascia(fascia, new Date(t))) compilate++
+  return { attese, compilate, percentuale: Math.min(100, (compilate / attese) * 100) }
+}
+
+// ---- Formati ----------------------------------------------------------
+
+/** Ore con una cifra decimale all'italiana: 2,5 */
+export const ore = (minuti) =>
+  (minuti / 60).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
+
+export const percento = (p) =>
+  p == null ? '' : `${p.toLocaleString('it-IT', { maximumFractionDigits: 0 })}%`
+
+// ---- Stima vs Reale (Fase 4) --------------------------------------------
+
+/**
+ * Confronta la stima mensile di ogni categoria con il reale.
+ * Per il mese in corso confronta con la PROIEZIONE a fine mese (altrimenti
+ * a metà mese sembrerebbe tutto "sotto stima"); per i mesi passati con il reale.
+ *
+ * @param righeRiepilogo  riepilogo(...).righe
+ * @param fattore         fattoreProiezione(...) oppure null
+ * @returns { righe: [{ categoria, stima, valore, scostamento, scostamentoPct }], totale }
+ *          (valori in ORE)
+ */
+export function stimaVsReale(righeRiepilogo, fattore = null) {
+  const righe = righeRiepilogo
+    .filter((x) => x.categoria.lavoro)
+    .map((x) => {
+      const stima = x.categoria.ore_stimate_mese == null ? null : Number(x.categoria.ore_stimate_mese)
+      const valore = (x.minuti / 60) * (fattore ?? 1)
+      const scostamento = stima == null ? null : valore - stima
+      return {
+        categoria: x.categoria,
+        stima,
+        valore,
+        scostamento,
+        scostamentoPct: stima ? (scostamento / stima) * 100 : null,
+      }
+    })
+  const stimaTot = righe.reduce((s, r) => s + (r.stima ?? 0), 0)
+  const valoreTot = righe.reduce((s, r) => s + r.valore, 0)
+  return {
+    righe,
+    totale: {
+      stima: stimaTot,
+      valore: valoreTot,
+      scostamento: valoreTot - stimaTot,
+      scostamentoPct: stimaTot ? ((valoreTot - stimaTot) / stimaTot) * 100 : null,
+    },
+    usaProiezione: fattore != null,
+  }
+}
+
+/** Ore delegabili: quanto avresti potuto passare ad altri. */
+export function delegabili(righe, categorie) {
+  const lavoro = new Set(categorie.filter((c) => c.lavoro).map((c) => c.id))
+  const diLavoro = righe.filter((r) => lavoro.has(r.categoria_id))
+  const tot = diLavoro.reduce((s, r) => s + r.minuti, 0)
+  const si = diLavoro.filter((r) => r.delegabile === true).reduce((s, r) => s + r.minuti, 0)
+  const risposte = diLavoro.filter((r) => r.delegabile != null).reduce((s, r) => s + r.minuti, 0)
+  return {
+    minutiLavoro: tot,
+    minutiDelegabili: si,
+    minutiConRisposta: risposte, // ore in cui hai risposto alla domanda (sì o no)
+    percentuale: tot ? (si / tot) * 100 : null,
+  }
+}
+
+/** "+12,5" / "−3" con segno, in ore */
+export const conSegno = (oreNum) =>
+  `${oreNum > 0.05 ? '+' : oreNum < -0.05 ? '−' : ''}${Math.abs(oreNum).toLocaleString('it-IT', { maximumFractionDigits: 1 })}`
