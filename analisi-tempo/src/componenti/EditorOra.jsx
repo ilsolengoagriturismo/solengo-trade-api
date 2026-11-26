@@ -7,7 +7,7 @@ import * as archivio from '../lib/archivio.js'
 import { usaArchivio } from '../lib/usaArchivio.js'
 import { etichettaOra, etichettaGiorno } from '../lib/ore.js'
 import { Pillole, OPZIONI_DELEGA, OPZIONI_ENERGIA } from './Scelte.jsx'
-import { percentualeOra } from '../lib/divisione.js'
+import { percentualeOra, PASSO } from '../lib/divisione.js'
 
 export default function EditorOra({ ora, onChiudi }) {
   const stato = usaArchivio()
@@ -29,7 +29,7 @@ export default function EditorOra({ ora, onChiudi }) {
   }
 
   function aggiungi() {
-    const resto = Math.max(5, 60 - totale)
+    const resto = Math.max(PASSO, 60 - totale)
     setVoci((vv) => [...vv, archivio.nuovaVoce(categorie[0].id, Math.min(60, resto))])
   }
 
@@ -78,18 +78,18 @@ export default function EditorOra({ ora, onChiudi }) {
                   ✕
                 </button>
               </div>
-              {/* minuti a blocchi di 5, senza superare i 60 dell'ora */}
+              {/* minuti a blocchi di PASSO, senza superare i 60 dell'ora */}
               <div className="riga-dettaglio">
                 <span>Minuti</span>
                 <span className="dividi-comandi">
-                  <button aria-label="Meno 5 minuti" disabled={v.minuti <= 5} onClick={() => cambia(i, 'minuti', v.minuti - 5)}>
+                  <button aria-label={`Meno ${PASSO} minuti`} disabled={v.minuti <= PASSO} onClick={() => cambia(i, 'minuti', v.minuti - PASSO)}>
                     −
                   </button>
                   <span className="dividi-valore">
                     <b>{v.minuti}′</b>
                     <small>{percentualeOra(v.minuti)}</small>
                   </span>
-                  <button aria-label="Più 5 minuti" disabled={totale + 5 > 60} onClick={() => cambia(i, 'minuti', v.minuti + 5)}>
+                  <button aria-label={`Più ${PASSO} minuti`} disabled={totale + PASSO > 60} onClick={() => cambia(i, 'minuti', v.minuti + PASSO)}>
                     +
                   </button>
                   {totale < 60 && (

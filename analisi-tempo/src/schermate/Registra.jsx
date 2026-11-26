@@ -68,7 +68,7 @@ export default function Registra() {
       salva(() => [archivio.nuovaVoce(c.id, 60)])
       return
     }
-    // modalità "dividi": ogni tocco aggiunge 5 minuti a quell'attività
+    // modalità "dividi": ogni tocco aggiunge div.PASSO minuti a quell'attività
     setSelezione((sel) => div.aggiungi(sel, c.id))
     navigator.vibrate?.(10)
   }
@@ -138,7 +138,7 @@ export default function Registra() {
           }}
         >
           ½ Dividi l'ora
-          <small>{dividi ? 'ogni tocco = +5 min' : 'più attività, a 5 min'}</small>
+          <small>{dividi ? `ogni tocco = +${div.PASSO} min` : `più attività, a ${div.PASSO} min`}</small>
         </button>
       </div>
 
@@ -164,7 +164,7 @@ export default function Registra() {
         <div className="pannello-dividi">
           {selezione.length === 0 && (
             <p className="piccolo centrato">
-              Tocca le attività che hai fatto in quest'ora: ogni tocco aggiunge 5 minuti.
+              Tocca le attività che hai fatto in quest'ora: ogni tocco aggiunge {div.PASSO} minuti.
             </p>
           )}
           {selezione.map((s) => (
@@ -174,14 +174,14 @@ export default function Registra() {
                 {archivio.categoriaPerId(s.categoria_id)?.nome}
               </span>
               <span className="dividi-comandi">
-                <button aria-label="Meno 5 minuti" onClick={() => setSelezione((x) => div.cambia(x, s.categoria_id, -div.PASSO))}>
+                <button aria-label={`Meno ${div.PASSO} minuti`} onClick={() => setSelezione((x) => div.cambia(x, s.categoria_id, -div.PASSO))}>
                   −
                 </button>
                 <span className="dividi-valore">
                   <b>{s.minuti}′</b>
                   <small>{div.percentualeOra(s.minuti)}</small>
                 </span>
-                <button aria-label="Più 5 minuti" disabled={!mancano} onClick={() => setSelezione((x) => div.cambia(x, s.categoria_id, div.PASSO))}>
+                <button aria-label={`Più ${div.PASSO} minuti`} disabled={!mancano} onClick={() => setSelezione((x) => div.cambia(x, s.categoria_id, div.PASSO))}>
                   +
                 </button>
                 {mancano > 0 && (

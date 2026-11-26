@@ -1,16 +1,16 @@
 // =====================================================================
-// "Dividi l'ora": quante attività vuoi, a blocchi di 5 minuti.
+// "Dividi l'ora": quante attività vuoi, a blocchi di 10 minuti (PASSO).
 // La selezione è una lista [{ categoria_id, minuti }] il cui totale
 // non supera mai 60. Funzioni "pure": restituiscono una nuova lista.
 // =====================================================================
 
-export const PASSO = 5
+export const PASSO = 10 // minuti per ogni tocco: cambia qui per blocchi diversi
 export const ORA = 60
 
 export const totale = (sel) => sel.reduce((s, x) => s + x.minuti, 0)
 export const rimanenti = (sel) => ORA - totale(sel)
 
-/** Tocco su un'attività: +5′ (se è nuova la aggiunge con 5′). */
+/** Tocco su un'attività: +PASSO minuti (se è nuova la aggiunge con PASSO). */
 export function aggiungi(sel, categoriaId) {
   const resto = rimanenti(sel)
   const passo = Math.min(PASSO, resto)
@@ -20,7 +20,7 @@ export function aggiungi(sel, categoriaId) {
   return [...sel, { categoria_id: categoriaId, minuti: passo }]
 }
 
-/** Pulsanti − / +: cambia di ±5′ restando tra 0 e il massimo possibile. */
+/** Pulsanti − / +: cambia di ±PASSO restando tra 0 e il massimo possibile. */
 export function cambia(sel, categoriaId, delta) {
   const resto = rimanenti(sel)
   return sel.map((x) => {
