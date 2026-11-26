@@ -443,3 +443,4 @@ small { color: var(--tenue); }
 .testa-periodo h1 { font-size: 1.3rem; }
 /* le schede si adattano al numero (3 o 4 con "Periodo") */
 .schede { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.tabella-corso td.positivo { color: #15803d; font-weight: 700; }

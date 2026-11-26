@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   periodo, spostaPeriodo, riepilogo, oreFascia, fattoreProiezione, copertura, ore,
   stimaVsReale, delegabili, conSegno, matriceUrgenteImportante, allineamentoObiettivo, bolleMappa,
-  concentrazione, frasiChiave, oreMigliori,
+  concentrazione, frasiChiave, oreMigliori, tempoEnergia, energiaComeRighe,
 } from './report.js'
 
 const fascia = Object.fromEntries(
@@ -236,5 +236,46 @@ describe('ore migliori', () => {
     const o = oreMigliori(righe)
     expect(o.migliore).toEqual({ da: 6, a: 8, media: 3 })
     expect(o.ore.map((x) => x.ora)).toEqual([6, 7, 14, 15])
+  })
+})
+
+describe('tempo × energia (Esydo)', () => {
+  const cats = [
+    { id: 'A', nome: 'Lavoro autonomo' },
+    { id: 'S', nome: 'Supervisione' },
+  ]
+  const h = (ora) => new Date(2026, 10, 26, ora).toISOString()
+  const righe = [
+    { ora_inizio: h(7), categoria_id: 'A', minuti: 60 },
+    { ora_inizio: h(8), categoria_id: 'A', minuti: 60 },
+    { ora_inizio: h(14), categoria_id: 'S', minuti: 40 },
+    { ora_inizio: h(14), categoria_id: 'A', minuti: 20 },
+    { ora_inizio: h(15), categoria_id: 'S', minuti: 60 }, // senza misura: ignorata
+  ]
+  const energia = [
+    { ora: h(7), escore: 80 },
+    { ora: h(8), escore: 70 },
+    { ora: h(14), escore: 40 },
+  ]
+  it('media per attività e differenza dalla media generale', () => {
+    const t = tempoEnergia(righe, energia, cats)
+    expect(t.minutiConEnergia).toBe(180)
+    expect(t.media).toBeCloseTo((80 * 60 + 70 * 60 + 40 * 60) / 180) // 63,3
+    expect(t.righe[0].categoria.id).toBe('A') // la più "energica" in cima
+    expect(t.righe[0].media).toBeCloseTo((80 * 60 + 70 * 60 + 40 * 20) / 140)
+    expect(t.righe[1].media).toBe(40)
+    expect(t.righe[1].differenza).toBeLessThan(0)
+  })
+  it('senza dati Esydo: niente media', () => {
+    expect(tempoEnergia(righe, [], cats)).toEqual({ media: null, minutiConEnergia: 0, righe: [] })
+  })
+  it('le letture Esydo alimentano anche "le tue ore migliori"', () => {
+    const giorni = [24, 25].flatMap((g) => [
+      { ora: new Date(2026, 10, g, 6).toISOString(), escore: 80 },
+      { ora: new Date(2026, 10, g, 7).toISOString(), escore: 78 },
+      { ora: new Date(2026, 10, g, 15).toISOString(), escore: 40 },
+    ])
+    const o = oreMigliori(energiaComeRighe(giorni))
+    expect(o.migliore).toMatchObject({ da: 6, a: 8 })
   })
 })

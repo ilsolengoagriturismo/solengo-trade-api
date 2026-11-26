@@ -280,6 +280,30 @@ stima: 140, 28, 20, 28, 28, 0, 5, 28 = **277 ore al mese**.
 | `20261126000008_mappa_a_tocco.sql` | mappa a tocco |
 | `20261126000009_valore_ora.sql` | valore della tua ora |
 | `20261126000010_settimana_ideale.sql` | settimana ideale e periodo di analisi |
+| `20261126000011_collegamento_esydo.sql` | collegamento con Esydo (energia misurata) |
+
+### Collegamento con Esydo
+
+Se l'app usa lo stesso progetto Supabase di Esydo, il report può usare l'**energia
+misurata** (escore) al posto di quella segnata a mano:
+
+- **Tempo × energia**: per ogni attività, l'energia media nelle ore in cui l'hai fatta
+  e quanti punti sopra o sotto la tua media.
+- **Le tue ore migliori**: calcolate dall'escore.
+- **In breve**: segnala l'attività che ti costa più energia.
+
+Per attivarlo, dopo la migrazione 11, collega i due account dal SQL Editor (una volta sola):
+
+```sql
+insert into public.collegamento_esydo (user_id, esydo_user_id)
+values ('<id utente dell'app del tempo>', '<id utente Esydo>');
+```
+
+L'app vede solo le **medie ora per ora** dell'escore, non i dati grezzi di Esydo.
+
+**Fasi:** la *settimana ideale* è già pronta ma nascosta, perché è uno strumento della
+fase 2 (dopo il mese di misurazione). Per mostrarla: `src/lib/fasi.js` →
+`FASE_2_ATTIVA = true`, poi ripubblica.
 
 ---
 

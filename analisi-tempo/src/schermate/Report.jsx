@@ -24,6 +24,8 @@ import {
   concentrazione,
   frasiChiave,
   oreMigliori,
+  tempoEnergia,
+  energiaComeRighe,
 } from '../lib/report.js'
 import { posizione } from '../lib/mappa.js'
 import { csvRiepilogo, csvDettaglio, pdfReport, condividiOScarica, nomeFile } from '../lib/esporta.js'
@@ -64,6 +66,16 @@ export default function Report() {
     // ricarico anche quando cambiano le registrazioni (stato.voci)
   }, [p.da.getTime(), p.a.getTime(), stato.voci])
 
+  // energia misurata da Esydo nello stesso periodo (vuota se non collegato)
+  const [esydo, setEsydo] = useState([])
+  useEffect(() => {
+    let annullato = false
+    archivio.caricaEnergiaEsydo(p.da, p.a).then((e) => !annullato && setEsydo(e))
+    return () => {
+      annullato = true
+    }
+  }, [p.da.getTime(), p.a.getTime()])
+
   const r = riepilogo(dati.righe, stato.categorie)
   const fattore = tipo === 'mese' ? fattoreProiezione(fascia, p.da, p.a, adesso) : null
   const cop = copertura(dati.righe, fascia, p.da, p.a, adesso)
@@ -79,9 +91,13 @@ export default function Report() {
   const allin = allineamentoObiettivo(dati.righe, stato.categorie)
   const bolle = bolleMappa(dati.righe, stato.categorie)
   const conc = concentrazione(dati.righe, stato.categorie)
-  const energia = oreMigliori(dati.righe)
+  // ore migliori: energia misurata da Esydo se c'è, altrimenti quella che segni tu
+  const energia = esydo.length
+    ? { ...oreMigliori(energiaComeRighe(esydo)), scala: 100, fonte: 'Esydo (escore da 0 a 100)' }
+    : { ...oreMigliori(dati.righe), scala: 3, fonte: 'segnata da te (da 1 a 3)' }
+  const tEn = tempoEnergia(dati.righe, esydo, stato.categorie)
   const valoreOra = stato.impostazioni?.valore_ora ? Number(stato.impostazioni.valore_ora) : null
-  const frasi = frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra })
+  const frasi = frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra, tempoEn: tEn })
 
   return (
     <div className="report">
@@ -229,6 +245,7 @@ export default function Report() {
       {aderenza && <IdealeVsReale a={aderenza} />}
       <Delegabili deleg={deleg} r={r} valoreOra={valoreOra} />
       <Concentrazione c={conc} />
+      <TempoEnergia t={tEn} />
       <OreMigliori e={energia} />
       <MappaBolle bolle={bolle} />
       <UrgenteImportante m={matrice} />
@@ -579,6 +596,41 @@ function Concentrazione({ c }) {
 }
 
 // ---------------------------------------------------------------------
+// TEMPO × ENERGIA: quali attività ti danno o ti tolgono energia (Esydo)
+// ---------------------------------------------------------------------
+function TempoEnergia({ t }) {
+  if (t.media == null) return null
+  const punti = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(Math.round(n))}`
+  return (
+    <section className="sezione-report">
+      <h2>Tempo × energia</h2>
+      <p className="piccolo">
+        Energia misurata da Esydo nelle ore in cui hai fatto ogni attività. La tua media nel
+        periodo è {Math.round(t.media)} su 100 ({ore(t.minutiConEnergia)} h con misura).
+      </p>
+      <table className="tabella-corso">
+        <tbody>
+          {t.righe.map((x) => (
+            <tr key={x.categoria.id}>
+              <td>
+                <span className="pallino" style={{ '--colore': x.categoria.colore }} />
+                {x.categoria.nome}
+              </td>
+              <td className="num">{Math.round(x.media)}</td>
+              <td className={'num ' + (x.differenza < -5 ? 'scostato' : x.differenza > 5 ? 'positivo' : '')}>
+                {punti(x.differenza)}
+              </td>
+              <td className="num">{ore(x.minuti)} h</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="piccolo">In alto le attività con più energia, in basso quelle che ti costano di più.</p>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
 // LE TUE ORE MIGLIORI: energia media per ora del giorno
 // ---------------------------------------------------------------------
 function OreMigliori({ e }) {
@@ -598,13 +650,13 @@ function OreMigliori({ e }) {
           <div key={o.ora} className="colonna-energia" title={`${due(o.ora)}: ${o.media.toFixed(1)}`}>
             <span
               className={'barra-energia' + (e.migliore && o.ora >= e.migliore.da && o.ora < e.migliore.a ? ' top' : '')}
-              style={{ height: `${(o.media / 3) * 100}%` }}
+              style={{ height: `${(o.media / e.scala) * 100}%` }}
             />
             <small>{o.ora}</small>
           </div>
         ))}
       </div>
-      <p className="piccolo">Energia media (da 1 a 3) che hai segnato per ogni ora del giorno.</p>
+      <p className="piccolo">Energia media per ogni ora del giorno: {e.fonte}.</p>
     </section>
   )
 }

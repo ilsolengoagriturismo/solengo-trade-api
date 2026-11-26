@@ -329,7 +329,7 @@ const euro = (n) => n.toLocaleString('it-IT', { style: 'currency', currency: 'EU
  * Le 3-4 cose più importanti del periodo, in italiano semplice.
  * @param dati { r, deleg, matrice, allin, svr, conc, valoreOra }
  */
-export function frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra }) {
+export function frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra, tempoEn }) {
   const frasi = []
   if (!r.minutiLavoro) return frasi
 
@@ -369,13 +369,21 @@ export function frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra }) 
     )
   }
 
-  // 5. allineamento all'obiettivo
-  if (allin?.media != null && frasi.length < 4) {
+  // 5. energia Esydo: l'attività che ti costa di più
+  const peggiore = tempoEn?.righe?.at(-1)
+  if (peggiore && tempoEn.righe.length >= 2 && peggiore.differenza <= -5 && peggiore.minuti >= 60) {
+    frasi.push(
+      `Energia: durante «${peggiore.categoria.nome}» sei a ${Math.round(peggiore.media)}/100, ${Math.round(-peggiore.differenza)} punti sotto la tua media.`,
+    )
+  }
+
+  // 6. allineamento all'obiettivo
+  if (allin?.media != null && frasi.length < 5) {
     frasi.push(
       `In linea con l'obiettivo: media ${allin.media.toLocaleString('it-IT', { maximumFractionDigits: 1 })} su 5.`,
     )
   }
-  return frasi.slice(0, 4)
+  return frasi.slice(0, 5)
 }
 
 // ---- Le tue ore migliori (Loehr & Schwartz: gestire l'energia) -------------
@@ -408,3 +416,43 @@ export function oreMigliori(righe) {
   }
   return { ore: ore.filter((o) => o.media != null), migliore }
 }
+
+// ---- Tempo × energia (Esydo) ------------------------------------------------
+
+/**
+ * Collega ogni attività all'energia misurata da Esydo nella stessa ora.
+ * Per ogni categoria: escore medio (pesato sui minuti) nelle ore in cui
+ * l'hai fatta, e differenza rispetto alla tua media generale.
+ * @param righe    registrazioni del periodo
+ * @param energia  [{ ora: ISO inizio ora, escore }] da caricaEnergiaEsydo
+ */
+export function tempoEnergia(righe, energia, categorie) {
+  const perOra = new Map(energia.map((e) => [new Date(e.ora).getTime(), e.escore]))
+  const perCat = new Map()
+  let minuti = 0
+  let somma = 0
+  for (const r of righe) {
+    const e = perOra.get(new Date(r.ora_inizio).getTime())
+    if (e == null) continue
+    const c = perCat.get(r.categoria_id) ?? { minuti: 0, somma: 0 }
+    c.minuti += r.minuti
+    c.somma += e * r.minuti
+    perCat.set(r.categoria_id, c)
+    minuti += r.minuti
+    somma += e * r.minuti
+  }
+  const media = minuti ? somma / minuti : null
+  const righeCat = categorie
+    .filter((c) => perCat.has(c.id))
+    .map((c) => {
+      const x = perCat.get(c.id)
+      const m = x.somma / x.minuti
+      return { categoria: c, minuti: x.minuti, media: m, differenza: m - media }
+    })
+    .sort((a, b) => b.differenza - a.differenza)
+  return { media, minutiConEnergia: minuti, righe: righeCat }
+}
+
+/** Le letture Esydo trasformate per oreMigliori (energia = escore). */
+export const energiaComeRighe = (energia) =>
+  energia.map((e) => ({ ora_inizio: e.ora, minuti: 60, energia: e.escore }))

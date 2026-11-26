@@ -274,3 +274,17 @@ export async function caricaPeriodo(da, a) {
   })
   return { righe, daTelefono }
 }
+
+/**
+ * Energia misurata da Esydo (escore 0-100) ora per ora nel periodo.
+ * Se l'account non è collegato a Esydo, o non c'è rete, restituisce [].
+ */
+export async function caricaEnergiaEsydo(da, a) {
+  if (!supabase) return []
+  const { data, error } = await supabase.rpc('energia_esydo_per_ora', {
+    p_da: da.toISOString(),
+    p_a: a.toISOString(),
+  })
+  if (error || !data) return []
+  return data.map((r) => ({ ora: new Date(r.ora).toISOString(), escore: Number(r.escore) }))
+}
