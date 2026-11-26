@@ -30,11 +30,12 @@ export default function Impostazioni({ utente }) {
       setMessaggio(
         navigator.onLine ? `Errore: ${error.message}` : 'Serve la rete per cambiare le impostazioni.',
       )
-      return
+      return false
     }
     await archivio.scaricaConfigurazione().catch(() => {})
     setMessaggio(ok)
     setTimeout(() => setMessaggio(''), 2000)
+    return true
   }
 
   return (
@@ -55,6 +56,7 @@ export default function Impostazioni({ utente }) {
       <section className="sezione">
         <h2>Account</h2>
         <p className="piccolo">Collegato come {utente.email}</p>
+        <ImpostaPassword esegui={esegui} />
         {stato.coda.length > 0 && (
           <p className="messaggio-errore">
             Hai {stato.coda.length} ore non ancora inviate: se esci adesso le perdi. Aspetta di
@@ -262,5 +264,75 @@ function ModificaCategoria({ categoria: c, stato, esegui }) {
         <button className="secondario">Aggiungi</button>
       </form>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Password: serve per entrare dall'app installata sulla Home, dove il
+// link via email non funziona (si aprirebbe in Safari).
+// Attenzione: l'account è lo stesso del progetto Supabase, quindi la
+// password vale anche per le altre app collegate allo stesso progetto.
+// ---------------------------------------------------------------------
+function ImpostaPassword({ esegui }) {
+  const [aperto, setAperto] = useState(false)
+  const [password, setPassword] = useState('')
+  const [ripeti, setRipeti] = useState('')
+
+  if (!aperto) {
+    return (
+      <button className="secondario largo" onClick={() => setAperto(true)}>
+        🔑 Imposta o cambia password
+      </button>
+    )
+  }
+  const errore =
+    password && password.length < 8
+      ? 'Almeno 8 caratteri'
+      : ripeti && ripeti !== password
+        ? 'Le due password non coincidono'
+        : ''
+  return (
+    <form
+      className="modulo riquadro-password"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        if (errore || !password) return
+        const ok = await esegui(supabase.auth.updateUser({ password }), 'Password salvata ✓')
+        if (!ok) return // resta aperto per riprovare
+        setPassword('')
+        setRipeti('')
+        setAperto(false)
+      }}
+    >
+      <p className="piccolo">
+        Con la password entri anche dall'icona sulla Home (Email e password). Vale per questo
+        account, anche nelle altre app collegate allo stesso progetto.
+      </p>
+      <label>
+        Nuova password
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+      <label>
+        Ripeti la password
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={ripeti}
+          onChange={(e) => setRipeti(e.target.value)}
+        />
+      </label>
+      {errore && <p className="messaggio-errore">{errore}</p>}
+      <button className="primario" disabled={!password || !!errore || ripeti !== password}>
+        Salva password
+      </button>
+      <button type="button" className="link" onClick={() => setAperto(false)}>
+        Annulla
+      </button>
+    </form>
   )
 }
