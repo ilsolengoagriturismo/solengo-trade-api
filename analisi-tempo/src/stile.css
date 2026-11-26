@@ -265,3 +265,23 @@ small { color: var(--tenue); }
 .modifica-categoria { display: flex; flex-direction: column; gap: 10px; padding: 0 0 14px 28px; }
 .riga-sotto { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .riga-sotto input { flex: 1; }
+
+/* ---- Notifiche / guida ---- */
+.guida { display: flex; flex-direction: column; gap: 12px; }
+.passi { padding-left: 1.3rem; display: flex; flex-direction: column; gap: 10px; }
+.passi li { padding-left: 4px; }
+.icona-ios { display: inline-block; padding: 0 6px; border: 1px solid var(--bordo); border-radius: 6px; }
+.messaggio-ok { color: #15803d; font-weight: 600; }
+.grande { padding: 18px; font-size: 1.1rem; }
+.voce-menu {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  text-align: left; cursor: pointer;
+}
+.voce-menu small { display: block; font-size: .82rem; }
+.invito {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 12px; padding: 10px 12px;
+  background: #fff4d6; color: #5c4400; border-radius: var(--raggio); font-size: .92rem;
+}
+@media (prefers-color-scheme: dark) { .invito { background: #3a2f12; color: #f5dea0; } }
+.chiave { display: block; word-break: break-all; font-size: .85rem; padding: 8px; background: var(--sfondo); border-radius: 8px; margin: 6px 0; }

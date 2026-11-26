@@ -1,0 +1,17 @@
+{
+  "name": "Il mio tempo",
+  "short_name": "Il mio tempo",
+  "description": "Analisi del proprio tempo, un'ora alla volta",
+  "lang": "it",
+  "start_url": "/registra",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f5f1",
+  "theme_color": "#1f3a2e",
+  "icons": [
+    { "src": "/icona-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icona-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icona-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

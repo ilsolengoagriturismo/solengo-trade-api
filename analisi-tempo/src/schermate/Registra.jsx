@@ -20,6 +20,8 @@ import {
   chiaveOra,
 } from '../lib/ore.js'
 import { Pillole, OPZIONI_DELEGA, OPZIONI_ENERGIA } from '../componenti/Scelte.jsx'
+import { permesso } from '../lib/notifiche.js'
+import { vaiA } from '../lib/navigazione.js'
 
 export default function Registra() {
   const stato = usaArchivio()
@@ -94,6 +96,7 @@ export default function Registra() {
 
   return (
     <div className={dividi ? 'registra dividendo' : 'registra'}>
+      <InvitoNotifiche />
       {ultimo && <RiquadroSalvato ultimo={ultimo} setUltimo={setUltimo} stato={stato} />}
 
       <header className="bersaglio">
@@ -192,6 +195,29 @@ export default function Registra() {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Invito ad attivare le notifiche (finché non sono attive o lo chiudi). */
+function InvitoNotifiche() {
+  const [chiuso, setChiuso] = useState(() => localStorage.getItem('analisi-tempo.invito-chiuso') === '1')
+  if (chiuso || permesso() === 'granted') return null
+  return (
+    <div className="invito">
+      <button className="link" onClick={() => vaiA('/notifiche')}>
+        🔔 Attiva il promemoria ogni ora ›
+      </button>
+      <button
+        className="link"
+        aria-label="Chiudi"
+        onClick={() => {
+          localStorage.setItem('analisi-tempo.invito-chiuso', '1')
+          setChiuso(true)
+        }}
+      >
+        ✕
+      </button>
     </div>
   )
 }

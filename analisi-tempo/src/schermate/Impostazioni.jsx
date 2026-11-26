@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import * as archivio from '../lib/archivio.js'
 import { usaArchivio } from '../lib/usaArchivio.js'
+import { vaiA } from '../lib/navigazione.js'
 
 const GIORNI = [
   ['1', 'Lunedì'],
@@ -39,6 +40,14 @@ export default function Impostazioni({ utente }) {
   return (
     <div className="impostazioni">
       {messaggio && <div className="avviso fisso">{messaggio}</div>}
+
+      <button className="sezione voce-menu" onClick={() => vaiA('/notifiche')}>
+        <span>
+          🔔 <b>Notifiche ogni ora</b>
+          <small>Attiva, prova, pausa per oggi, installazione sull'iPhone</small>
+        </span>
+        <span className="freccia">›</span>
+      </button>
 
       <Fascia stato={stato} utente={utente} esegui={esegui} />
       <Categorie stato={stato} esegui={esegui} />

@@ -12,11 +12,16 @@ import Login from './schermate/Login.jsx'
 import Registra from './schermate/Registra.jsx'
 import Giornata from './schermate/Giornata.jsx'
 import Impostazioni from './schermate/Impostazioni.jsx'
+import Notifiche from './schermate/Notifiche.jsx'
+import GeneraChiavi from './schermate/GeneraChiavi.jsx'
+import { riconfermaIscrizione } from './lib/notifiche.js'
 
 const PAGINE = {
   '/registra': { titolo: 'Registra', icona: '⏱️', Componente: Registra },
   '/giornata': { titolo: 'Giornata', icona: '📅', Componente: Giornata },
   '/impostazioni': { titolo: 'Impostazioni', icona: '⚙️', Componente: Impostazioni },
+  // schermata guidata, raggiungibile da Impostazioni (non nel menu)
+  '/notifiche': { titolo: 'Notifiche', Componente: Notifiche, nascosta: true },
 }
 
 function percorsoAttuale() {
@@ -57,7 +62,17 @@ export default function App() {
     }
     archivio.avvia(idUtente)
     aggiorna()
+    riconfermaIscrizione()
   }, [idUtente])
+
+  // --- tocco su una notifica con l'app già aperta: il service worker
+  //     ci chiede di andare alla registrazione ---
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const suMessaggio = (e) => e.data?.tipo === 'vai' && vaiA(e.data.percorso)
+    navigator.serviceWorker.addEventListener('message', suMessaggio)
+    return () => navigator.serviceWorker.removeEventListener('message', suMessaggio)
+  }, [])
 
   // --- rete e ritorno in primo piano: sincronizza ---
   useEffect(() => {
@@ -80,6 +95,8 @@ export default function App() {
     }
   }, [])
 
+  // pagina di servizio per la configurazione: funziona anche senza login
+  if (window.location.pathname === '/genera-chiavi') return <GeneraChiavi />
   if (!configurato) return <ConfigurazioneMancante />
   if (sessione === undefined) return <div className="caricamento">Caricamento…</div>
   if (!sessione) return <Login />
@@ -99,10 +116,12 @@ export default function App() {
         <Componente utente={sessione.user} />
       </main>
       <nav className="menu">
-        {Object.entries(PAGINE).map(([p, { titolo, icona }]) => (
+        {Object.entries(PAGINE)
+          .filter(([, pagina]) => !pagina.nascosta)
+          .map(([p, { titolo, icona }]) => (
           <button
             key={p}
-            className={p === percorso ? 'attivo' : ''}
+            className={p === percorso || (p === '/impostazioni' && PAGINE[percorso].nascosta) ? 'attivo' : ''}
             onClick={() => vaiA(p)}
           >
             <span aria-hidden>{icona}</span>

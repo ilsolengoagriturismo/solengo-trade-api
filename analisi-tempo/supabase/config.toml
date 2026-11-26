@@ -1,0 +1,6 @@
+# Configurazione usata solo se pubblichi la funzione con la riga di comando
+# (npx supabase functions deploy). Dalla dashboard: togli "Verify JWT".
+[functions.notifica-oraria]
+# La funzione controlla da sola chi la chiama (segreto del cron o login
+# dell'utente), quindi il controllo automatico va disattivato.
+verify_jwt = false

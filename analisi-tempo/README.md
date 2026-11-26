@@ -9,7 +9,7 @@ dove va davvero il tuo tempo.
 | Fase | Contenuto | Stato |
 |---|---|---|
 | 1 | Database, login, registrazione rapida, timeline, uso offline | ✅ pronta |
-| 2 | App installabile (PWA) e notifiche orarie | da fare |
+| 2 | App installabile (PWA) e notifiche orarie | ✅ pronta |
 | 3 | Report giorno / settimana / mese | da fare |
 | 4 | Stima vs Reale, ore delegabili, export CSV e PDF | da fare |
 
@@ -120,7 +120,81 @@ In **Authentication**:
 
 Al primo accesso l'app crea da sola le 9 categorie e la fascia 8:00–23:00.
 
-*(L'installazione sulla Home e le notifiche arrivano con la Fase 2.)*
+---
+
+## Notifiche orarie (Fase 2)
+
+Come funziona: ogni ora al minuto 0 l'**orologio del database** (pg_cron) chiama la funzione
+`notifica-oraria` su Supabase. La funzione manda il promemoria solo se quell'ora è nella tua
+fascia di lavoro, non è un giorno di riposo, non hai messo "pausa per oggi" e non l'hai già
+registrata. Vercel non c'entra, quindi va bene il piano gratuito.
+
+### Passo 7 — Genera le chiavi
+
+1. Dal computer apri `https://<il-tuo-indirizzo>.vercel.app/genera-chiavi`.
+2. Premi **Genera chiavi** (una volta sola). Ottieni tre valori: `VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY` e `CRON_SECRET`. Tieni la pagina aperta per i passi successivi.
+3. Su **Vercel** → progetto → **Settings → Environment Variables** aggiungi
+   `VITE_VAPID_PUBLIC_KEY` = il valore di `VAPID_PUBLIC_KEY`.
+   Poi **Deployments → ⋯ → Redeploy**, perché la variabile entri nell'app.
+
+⚠️ La chiave **privata** va solo su Supabase, mai su Vercel.
+
+### Passo 8 — Segreti nel Vault e seconda migrazione
+
+In Supabase → **SQL Editor**, esegui questo (sostituisci i due valori tra apici):
+
+```sql
+select vault.create_secret('https://xxxx.supabase.co', 'url_progetto');   -- Project URL
+select vault.create_secret('IL-TUO-CRON_SECRET', 'segreto_cron');         -- dal passo 7
+```
+
+Poi apri `supabase/migrations/20261126000002_notifiche.sql`, copia tutto, incolla e **Run**.
+
+> Se compare un errore su `pg_cron` o `pg_net`: **Database → Extensions**, attiva `pg_cron`
+> e `pg_net`, poi riesegui la migrazione.
+
+### Passo 9 — Pubblica la funzione `notifica-oraria`
+
+1. Supabase → **Edge Functions → Secrets** (o *Manage secrets*). Aggiungi:
+
+   | Nome | Valore |
+   |---|---|
+   | `VAPID_PUBLIC_KEY` | dal passo 7 |
+   | `VAPID_PRIVATE_KEY` | dal passo 7 |
+   | `CRON_SECRET` | dal passo 7 |
+   | `VAPID_SUBJECT` | `mailto:` più la tua email, per esempio `mailto:nome@dominio.it` |
+
+2. **Edge Functions → Deploy a new function → Via Editor**.
+   - Nome: **`notifica-oraria`** (esattamente così)
+   - Cancella il codice di esempio e incolla tutto il file
+     `supabase/functions/notifica-oraria/index.ts`
+   - **Deploy function**
+3. Nella pagina della funzione apri **Details** (o *Settings*) e **disattiva
+   "Verify JWT" / "Enforce JWT verification"**, poi salva. La funzione controlla da sola chi
+   la chiama: il segreto del cron oppure il tuo login.
+
+*(Se preferisci la riga di comando: `npx supabase functions deploy notifica-oraria --no-verify-jwt`.)*
+
+### Passo 10 — Installa l'app sull'iPhone e attiva le notifiche
+
+Serve iOS 16.4 o successivo (Impostazioni → Generali → Info → Versione iOS).
+
+1. Apri l'indirizzo dell'app in **Safari**.
+2. Tocca **Condividi** (il quadrato con la freccia) → **Aggiungi alla schermata Home** →
+   lascia attivo *Apri come app web* → **Aggiungi**.
+3. Apri **"Il mio tempo"** dall'icona sulla Home. Rientra con il **codice** della mail:
+   l'app installata non condivide il login con Safari.
+4. **Impostazioni → 🔔 Notifiche ogni ora → Attiva notifiche** → **Consenti**.
+5. Tocca **Invia notifica di prova**, poi **chiudi l'app** (torna alla Home). In pochi secondi
+   deve arrivare *"Notifica di prova ✓"*. Toccala: si apre la registrazione.
+
+**Da sapere**
+- La prima notifica oraria arriva allo scoccare dell'ora successiva, per esempio alle 15:00
+  per l'ora 14–15.
+- Con l'iPhone in **Full immersion / Non disturbare** le notifiche arrivano in silenzio. Se
+  vuoi, aggiungi "Il mio tempo" alle app consentite.
+- Se disinstalli l'icona dalla Home, le notifiche si fermano. Reinstallala e ripeti il punto 4.
 
 ---
 
@@ -148,6 +222,9 @@ Con le frecce ‹ › cambi giorno.
   se conta come lavoro, per nasconderla o per gestire le sottocategorie. Le categorie non
   si cancellano, si nascondono, così i report passati restano corretti.
 
+**Notifiche** (Impostazioni → 🔔): attiva o disattiva su questo telefono, notifica di prova,
+**pausa notifiche per oggi** (domani ripartono da sole), promemoria orari on/off.
+
 ---
 
 ## Checklist di prova — Fase 1
@@ -173,6 +250,25 @@ Spunta ogni voce dal telefono:
 - [ ] Impostazioni: metto la domenica come riposo; la domenica non mi chiede ore.
 - [ ] Da computer, in Supabase → **Table Editor → registrazioni**, vedo le mie righe.
 
+## Checklist di prova — Fase 2
+
+- [ ] Da Safari: Condividi → Aggiungi alla schermata Home. Compare l'icona con l'orologio verde.
+- [ ] Aperta dalla Home, l'app è a schermo intero (niente barra di Safari).
+- [ ] Rientro con il codice della mail.
+- [ ] Da Safari (non installata), Impostazioni → Notifiche mostra la guida passo passo.
+- [ ] Dall'app installata: **Attiva notifiche** → l'iPhone chiede il permesso → Consenti →
+      *"✓ Notifiche attive su questo telefono"*.
+- [ ] **Invia notifica di prova**, chiudo l'app → arriva entro pochi secondi.
+- [ ] Tocco la notifica → si apre direttamente la schermata Registra.
+- [ ] Aspetto lo scoccare dell'ora (dentro la fascia) → arriva *"14:00 – 15:00…"*.
+- [ ] Registro l'ora in anticipo → allo scoccare **non** arriva la notifica per quell'ora.
+- [ ] **Pausa notifiche per oggi** → per il resto della giornata non arriva nulla.
+- [ ] Modalità aereo, apro l'app dalla Home → si apre lo stesso (offline) e posso registrare.
+- [ ] Da computer: Supabase → **Table Editor → push_iscrizioni** c'è una riga "iPhone" con
+      `ultimo_invio` aggiornato.
+- [ ] Se una notifica non arriva: Supabase → **Edge Functions → notifica-oraria → Logs**, e
+      in **Integrations → Cron → Jobs** il lavoro `notifica-oraria` con le sue esecuzioni.
+
 ---
 
 ## Per lo sviluppo (facoltativo)
@@ -182,5 +278,15 @@ cd analisi-tempo
 cp .env.example .env.local   # e inserisci URL e chiave
 npm install
 npm run dev                  # apre l'app su http://localhost:5173
-npm test                     # test automatici dei calcoli sulle ore
+npm test                     # test automatici (ore, regole delle notifiche)
+```
+
+Struttura aggiunta in Fase 2:
+
+```
+public/sw.js                                   ← service worker: offline + notifiche
+public/manifest.webmanifest                    ← nome, icona, avvio a schermo intero
+supabase/functions/notifica-oraria/index.ts    ← invio dei push (regole + servizio)
+supabase/migrations/…0002_notifiche.sql        ← tabella iscrizioni + orologio pg_cron
+src/lib/notifiche.js, src/schermate/Notifiche.jsx
 ```
