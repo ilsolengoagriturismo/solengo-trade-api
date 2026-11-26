@@ -1,0 +1,524 @@
+// =====================================================================
+// IMPOSTAZIONI: fascia di lavoro, categorie e sottocategorie, uscita.
+// Queste modifiche vanno direttamente al database, quindi serve la rete.
+// =====================================================================
+import { useState } from 'react'
+import { supabase } from '../lib/supabase.js'
+import * as archivio from '../lib/archivio.js'
+import { usaArchivio } from '../lib/usaArchivio.js'
+import { vaiA } from '../lib/navigazione.js'
+import { FASE_2_ATTIVA } from '../lib/fasi.js'
+import { dimenticaChiave } from '../lib/accessoDiretto.js'
+
+const GIORNI = [
+  ['1', 'Lunedì'],
+  ['2', 'Martedì'],
+  ['3', 'Mercoledì'],
+  ['4', 'Giovedì'],
+  ['5', 'Venerdì'],
+  ['6', 'Sabato'],
+  ['0', 'Domenica'],
+]
+
+export default function Impostazioni({ utente }) {
+  const stato = usaArchivio()
+  const [messaggio, setMessaggio] = useState('')
+
+  /** Esegue una modifica sul database e ricarica la configurazione. */
+  async function esegui(promessa, ok = 'Salvato ✓') {
+    setMessaggio('Salvo…')
+    const { error } = await promessa
+    if (error) {
+      setMessaggio(
+        navigator.onLine ? `Errore: ${error.message}` : 'Serve la rete per cambiare le impostazioni.',
+      )
+      return false
+    }
+    await archivio.scaricaConfigurazione().catch(() => {})
+    setMessaggio(ok)
+    setTimeout(() => setMessaggio(''), 2000)
+    return true
+  }
+
+  return (
+    <div className="impostazioni">
+      {messaggio && <div className="avviso fisso">{messaggio}</div>}
+
+      <button className="sezione voce-menu" onClick={() => vaiA('/notifiche')}>
+        <span>
+          🔔 <b>Notifiche ogni ora</b>
+          <small>Attiva, prova, pausa per oggi, installazione sull'iPhone</small>
+        </span>
+        <span className="freccia">›</span>
+      </button>
+
+      <Obiettivo stato={stato} utente={utente} esegui={esegui} />
+      <Fascia stato={stato} utente={utente} esegui={esegui} />
+      {/* fase 2: si attiva dopo il mese di misurazione (lib/fasi.js) */}
+      {FASE_2_ATTIVA && <SettimanaIdeale stato={stato} utente={utente} esegui={esegui} />}
+      <PeriodoAnalisi stato={stato} utente={utente} esegui={esegui} />
+      <Categorie stato={stato} esegui={esegui} />
+
+      <section className="sezione">
+        <h2>Account</h2>
+        <p className="piccolo">Collegato come {utente.email}</p>
+        <ImpostaPassword esegui={esegui} />
+        {stato.coda.length > 0 && (
+          <p className="messaggio-errore">
+            Hai {stato.coda.length} ore non ancora inviate: se esci adesso le perdi. Aspetta di
+            avere rete.
+          </p>
+        )}
+        {import.meta.env.VITE_CHIAVE_PERSONALE ? (
+          <p className="piccolo">Accesso automatico attivo: l'app entra da sola, senza login.</p>
+        ) : (
+          <button className="secondario largo" onClick={() => {
+            dimenticaChiave() // altrimenti l'app rientrerebbe da sola
+            supabase.auth.signOut()
+          }}>
+          Esci
+        </button>
+        )}
+      </section>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Obiettivo principale: compare come promemoria quando valuti, da 1 a 5,
+// quanto ogni attività è in linea con l'obiettivo.
+function Obiettivo({ stato, utente, esegui }) {
+  const attuale = stato.impostazioni?.obiettivo ?? ''
+  const [testo, setTesto] = useState(attuale)
+  const valoreAttuale = stato.impostazioni?.valore_ora == null ? '' : String(Number(stato.impostazioni.valore_ora))
+  const [valore, setValore] = useState(valoreAttuale)
+  return (
+    <section className="sezione">
+      <h2>🎯 Obiettivo principale</h2>
+      <p className="piccolo">
+        Per ogni attività potrai dire da 1 a 5 quanto è in linea con questo obiettivo.
+      </p>
+      <textarea
+        className="campo-obiettivo"
+        rows={2}
+        maxLength={200}
+        placeholder="Es. Far crescere il ristorante delegando la gestione quotidiana"
+        value={testo}
+        onChange={(e) => setTesto(e.target.value)}
+        onBlur={() =>
+          testo.trim() !== attuale &&
+          esegui(
+            supabase.from('impostazioni').update({ obiettivo: testo.trim() || null }).eq('user_id', utente.id),
+          )
+        }
+      />
+      <div className="riga-dettaglio">
+        <span>
+          💶 Quanto vale un'ora del tuo tempo?
+          <small className="blocco">Serve a calcolare quanto "costano" le ore delegabili.</small>
+        </span>
+        <span className="campo-euro">
+          <input
+            className="input-corto"
+            inputMode="decimal"
+            placeholder="es. 60"
+            value={valore}
+            onChange={(e) => setValore(e.target.value)}
+            onBlur={() => {
+              const t = valore.trim().replace(',', '.')
+              const v = t === '' ? null : Number(t)
+              if (v != null && (Number.isNaN(v) || v < 0)) return
+              if (t !== valoreAttuale) {
+                esegui(supabase.from('impostazioni').update({ valore_ora: v }).eq('user_id', utente.id))
+              }
+            }}
+          />
+          €/h
+        </span>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Settimana ideale (Hyatt, Vanderkam): i blocchi che vorresti ogni
+// settimana. Il Report confronta la settimana vera con questa.
+function SettimanaIdeale({ stato, utente, esegui }) {
+  const ideale = stato.impostazioni?.settimana_ideale ?? {}
+  const categorie = stato.categorie.filter((c) => c.attiva)
+  const ore = Array.from({ length: 25 }, (_, h) => h)
+
+  function salva(nuova) {
+    esegui(supabase.from('impostazioni').update({ settimana_ideale: nuova }).eq('user_id', utente.id))
+  }
+  function cambia(g, i, campo, valore) {
+    const blocchi = (ideale[g] ?? []).map((b, j) => (j === i ? { ...b, [campo]: valore } : b))
+    const b = blocchi[i]
+    if (b.fine <= b.inizio) return // la fine deve venire dopo l'inizio
+    salva({ ...ideale, [g]: blocchi })
+  }
+  function aggiungi(g) {
+    const ultimo = (ideale[g] ?? []).at(-1)
+    const inizio = ultimo ? Math.min(23, ultimo.fine) : 6
+    const nuovo = { inizio, fine: Math.min(24, inizio + 2), categoria_id: categorie[0]?.id }
+    salva({ ...ideale, [g]: [...(ideale[g] ?? []), nuovo] })
+  }
+  function togli(g, i) {
+    salva({ ...ideale, [g]: (ideale[g] ?? []).filter((_, j) => j !== i) })
+  }
+
+  return (
+    <section className="sezione">
+      <h2>🗓️ Settimana ideale</h2>
+      <p className="piccolo">
+        Disegna i blocchi che vorresti ogni settimana (es. lunedì 6–8 Lavoro autonomo). Nel Report
+        vedrai quanto la settimana vera ci assomiglia.
+      </p>
+      {GIORNI.map(([g, nome]) => (
+        <div key={g} className="giorno-ideale">
+          <div className="giorno-ideale-testa">
+            <b>{nome}</b>
+            <button className="link" onClick={() => aggiungi(g)}>
+              + blocco
+            </button>
+          </div>
+          {(ideale[g] ?? []).map((b, i) => (
+            <div key={i} className="blocco-ideale">
+              <span className="orari">
+                <select value={b.inizio} onChange={(e) => cambia(g, i, 'inizio', +e.target.value)}>
+                  {ore.slice(0, 24).map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+                –
+                <select value={b.fine} onChange={(e) => cambia(g, i, 'fine', +e.target.value)}>
+                  {ore.slice(1).map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <select
+                className="blocco-categoria"
+                value={b.categoria_id}
+                onChange={(e) => cambia(g, i, 'categoria_id', e.target.value)}
+              >
+                {categorie.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+              <button className="link pericolo" aria-label="Togli blocco" onClick={() => togli(g, i)}>
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  )
+}
+
+// Periodo di analisi: le settimane dell'esercizio del corso. Il Report
+// aggiunge la scheda "Periodo" con il report finale per il coach.
+function PeriodoAnalisi({ stato, utente, esegui }) {
+  const dal = stato.impostazioni?.analisi_dal ?? ''
+  const al = stato.impostazioni?.analisi_al ?? ''
+  function salva(campi) {
+    const nuovoDal = campi.analisi_dal !== undefined ? campi.analisi_dal : dal
+    const nuovoAl = campi.analisi_al !== undefined ? campi.analisi_al : al
+    if (nuovoDal && nuovoAl && nuovoAl < nuovoDal) return // la fine non può venire prima dell'inizio
+    esegui(supabase.from('impostazioni').update(campi).eq('user_id', utente.id))
+  }
+  return (
+    <section className="sezione">
+      <h2>📋 Periodo di analisi</h2>
+      <p className="piccolo">
+        Le settimane dell'esercizio del corso. Con le due date impostate, il Report ha la scheda
+        «Periodo» con il report finale da mandare al coach.
+      </p>
+      <div className="riga-dettaglio">
+        <span>Dal</span>
+        <input type="date" className="campo-data" value={dal} onChange={(e) => salva({ analisi_dal: e.target.value || null })} />
+      </div>
+      <div className="riga-dettaglio">
+        <span>Al</span>
+        <input type="date" className="campo-data" value={al} onChange={(e) => salva({ analisi_al: e.target.value || null })} />
+      </div>
+      {(dal || al) && (
+        <button className="link" onClick={() => salva({ analisi_dal: null, analisi_al: null })}>
+          Togli il periodo
+        </button>
+      )}
+    </section>
+  )
+}
+
+function Fascia({ stato, utente, esegui }) {
+  const fascia = stato.impostazioni?.fascia ?? {}
+  const ore = Array.from({ length: 25 }, (_, h) => h)
+
+  function cambia(giorno, campo, valore) {
+    const nuova = { ...fascia, [giorno]: { ...fascia[giorno], [campo]: valore } }
+    const f = nuova[giorno]
+    if (f.fine <= f.inizio) return // fine dopo l'inizio
+    esegui(supabase.from('impostazioni').update({ fascia: nuova }).eq('user_id', utente.id))
+  }
+
+  return (
+    <section className="sezione">
+      <h2>Fascia di lavoro</h2>
+      <p className="piccolo">
+        Le ore fuori dalla fascia non ti vengono proposte da compilare. Togli la spunta per i giorni
+        di riposo.
+      </p>
+      {GIORNI.map(([g, nome]) => {
+        const f = fascia[g] ?? { attivo: false, inizio: 8, fine: 23 }
+        return (
+          <div key={g} className={'riga-fascia' + (f.attivo ? '' : ' riposo')}>
+            <label className="interruttore">
+              <input
+                type="checkbox"
+                checked={!!f.attivo}
+                onChange={(e) => cambia(g, 'attivo', e.target.checked)}
+              />
+              {nome}
+            </label>
+            {f.attivo ? (
+              <span className="orari">
+                <select value={f.inizio} onChange={(e) => cambia(g, 'inizio', +e.target.value)}>
+                  {ore.slice(0, 24).map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}:00
+                    </option>
+                  ))}
+                </select>
+                –
+                <select value={f.fine} onChange={(e) => cambia(g, 'fine', +e.target.value)}>
+                  {ore.slice(1).map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}:00
+                    </option>
+                  ))}
+                </select>
+              </span>
+            ) : (
+              <span className="piccolo">riposo</span>
+            )}
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
+function Categorie({ stato, esegui }) {
+  const [aperta, setAperta] = useState(null)
+
+  function aggiungiCategoria() {
+    const ordine = Math.max(0, ...stato.categorie.map((c) => c.ordine)) + 1
+    esegui(supabase.from('categorie').insert({ nome: 'Nuova categoria', colore: '#64748b', ordine }))
+  }
+
+  return (
+    <section className="sezione">
+      <h2>Categorie</h2>
+      <p className="piccolo">
+        Tocca una categoria per rinominarla, cambiarne il colore o le sottocategorie. Una categoria
+        nascosta non compare più nei pulsanti ma resta nei report passati.
+      </p>
+      {stato.categorie.map((c) => (
+        <div key={c.id} className="riga-categoria" style={{ '--colore': c.colore }}>
+          <button className="riga-categoria-testa" onClick={() => setAperta(aperta === c.id ? null : c.id)}>
+            <span className="pallino" />
+            <span className={c.attiva ? '' : 'barrato'}>{c.nome}</span>
+            {!c.lavoro && <small> (non è lavoro)</small>}
+            <span className="freccia">{aperta === c.id ? '▾' : '▸'}</span>
+          </button>
+          {aperta === c.id && <ModificaCategoria categoria={c} stato={stato} esegui={esegui} />}
+        </div>
+      ))}
+      <button className="secondario largo" onClick={aggiungiCategoria}>
+        + Nuova categoria
+      </button>
+    </section>
+  )
+}
+
+function ModificaCategoria({ categoria: c, stato, esegui }) {
+  const [nome, setNome] = useState(c.nome)
+  const [descrizione, setDescrizione] = useState(c.descrizione ?? '')
+  const [nuovaSotto, setNuovaSotto] = useState('')
+  const sotto = stato.sottocategorie.filter((s) => s.categoria_id === c.id)
+  const aggiorna = (campi) => esegui(supabase.from('categorie').update(campi).eq('id', c.id))
+
+  return (
+    <div className="modifica-categoria">
+      <label>
+        Nome
+        <input
+          value={nome}
+          maxLength={60}
+          onChange={(e) => setNome(e.target.value)}
+          onBlur={() => nome.trim() && nome !== c.nome && aggiorna({ nome: nome.trim() })}
+        />
+      </label>
+      <label>
+        Descrizione
+        <input
+          value={descrizione}
+          maxLength={120}
+          onChange={(e) => setDescrizione(e.target.value)}
+          onBlur={() =>
+            descrizione !== (c.descrizione ?? '') && aggiorna({ descrizione: descrizione.trim() || null })
+          }
+        />
+      </label>
+      {c.lavoro && (
+        <div className="riga-dettaglio">
+          <span>Ore stimate al mese</span>
+          <input
+            className="input-corto"
+            inputMode="decimal"
+            placeholder="–"
+            defaultValue={c.ore_stimate_mese == null ? '' : Number(c.ore_stimate_mese)}
+            onBlur={(e) => {
+              const t = e.target.value.trim().replace(',', '.')
+              const v = t === '' ? null : Number(t)
+              if (v != null && (Number.isNaN(v) || v < 0)) return
+              if (v !== (c.ore_stimate_mese == null ? null : Number(c.ore_stimate_mese))) {
+                aggiorna({ ore_stimate_mese: v })
+              }
+            }}
+          />
+        </div>
+      )}
+      <div className="riga-dettaglio">
+        <span>Colore</span>
+        <input type="color" value={c.colore} onChange={(e) => aggiorna({ colore: e.target.value })} />
+      </div>
+      <label className="interruttore">
+        <input type="checkbox" checked={c.lavoro} onChange={(e) => aggiorna({ lavoro: e.target.checked })} />
+        Conta come lavoro (togli la spunta per pause e tempo personale)
+      </label>
+      <label className="interruttore">
+        <input type="checkbox" checked={c.attiva} onChange={(e) => aggiorna({ attiva: e.target.checked })} />
+        Mostra tra i pulsanti
+      </label>
+
+      <h3>Sottocategorie</h3>
+      {sotto.length === 0 && <p className="piccolo">Nessuna.</p>}
+      {sotto.map((s) => (
+        <div key={s.id} className="riga-sotto">
+          <span className={s.attiva ? '' : 'barrato'}>{s.nome}</span>
+          <button
+            className="link"
+            onClick={() =>
+              esegui(supabase.from('sottocategorie').update({ attiva: !s.attiva }).eq('id', s.id))
+            }
+          >
+            {s.attiva ? 'Nascondi' : 'Mostra'}
+          </button>
+        </div>
+      ))}
+      <form
+        className="riga-sotto"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!nuovaSotto.trim()) return
+          esegui(
+            supabase.from('sottocategorie').insert({
+              categoria_id: c.id,
+              nome: nuovaSotto.trim(),
+              ordine: sotto.length + 1,
+            }),
+          )
+          setNuovaSotto('')
+        }}
+      >
+        <input
+          placeholder="Nuova sottocategoria"
+          maxLength={40}
+          value={nuovaSotto}
+          onChange={(e) => setNuovaSotto(e.target.value)}
+        />
+        <button className="secondario">Aggiungi</button>
+      </form>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Password: serve per entrare dall'app installata sulla Home, dove il
+// link via email non funziona (si aprirebbe in Safari).
+// Attenzione: l'account è lo stesso del progetto Supabase, quindi la
+// password vale anche per le altre app collegate allo stesso progetto.
+// ---------------------------------------------------------------------
+function ImpostaPassword({ esegui }) {
+  const [aperto, setAperto] = useState(false)
+  const [password, setPassword] = useState('')
+  const [ripeti, setRipeti] = useState('')
+
+  if (!aperto) {
+    return (
+      <button className="secondario largo" onClick={() => setAperto(true)}>
+        🔑 Imposta o cambia password
+      </button>
+    )
+  }
+  const errore =
+    password && password.length < 8
+      ? 'Almeno 8 caratteri'
+      : ripeti && ripeti !== password
+        ? 'Le due password non coincidono'
+        : ''
+  return (
+    <form
+      className="modulo riquadro-password"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        if (errore || !password) return
+        const ok = await esegui(supabase.auth.updateUser({ password }), 'Password salvata ✓')
+        if (!ok) return // resta aperto per riprovare
+        setPassword('')
+        setRipeti('')
+        setAperto(false)
+      }}
+    >
+      <p className="piccolo">
+        Con la password entri anche dall'icona sulla Home (Email e password). Vale per questo
+        account, anche nelle altre app collegate allo stesso progetto.
+      </p>
+      <label>
+        Nuova password
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+      <label>
+        Ripeti la password
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={ripeti}
+          onChange={(e) => setRipeti(e.target.value)}
+        />
+      </label>
+      {errore && <p className="messaggio-errore">{errore}</p>}
+      <button className="primario" disabled={!password || !!errore || ripeti !== password}>
+        Salva password
+      </button>
+      <button type="button" className="link" onClick={() => setAperto(false)}>
+        Annulla
+      </button>
+    </form>
+  )
+}
