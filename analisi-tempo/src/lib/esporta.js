@@ -82,7 +82,7 @@ const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
  * Crea il PDF del report. jsPDF viene caricato solo quando serve, così
  * l'app resta leggera.
  */
-export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, matrice, allin, cop, frasi = [] }) {
+export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, matrice, allin, cop, frasi = [], aderenza = null }) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const M = 15 // margine
@@ -203,6 +203,12 @@ export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, m
     note.push(
       `In linea con l'obiettivo: media ${allin.media.toLocaleString('it-IT', { maximumFractionDigits: 1 })} su 5 ` +
         `(su ${ore(allin.minutiConVoto)} h con voto).`,
+    )
+  }
+  if (aderenza?.totale.percentuale != null) {
+    note.push(
+      `Settimana ideale vs reale: aderenza ${percento(aderenza.totale.percentuale)} ` +
+        `(${ore(aderenza.totale.fatti)} h su ${ore(aderenza.totale.pianificati)} h pianificate).`,
     )
   }
   for (const t of note) {
