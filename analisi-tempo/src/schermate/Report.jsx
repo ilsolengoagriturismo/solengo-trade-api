@@ -28,6 +28,7 @@ import {
 import { posizione } from '../lib/mappa.js'
 import { csvRiepilogo, csvDettaglio, pdfReport, condividiOScarica, nomeFile } from '../lib/esporta.js'
 import { aderenzaIdeale, periodoAnalisi, NOMI_GIORNI } from '../lib/settimana.js'
+import { FASE_2_ATTIVA } from '../lib/fasi.js'
 
 const TIPI = [
   ['giorno', 'Giorno'],
@@ -71,7 +72,7 @@ export default function Report() {
   const etichettaOre = { giorno: 'Ore', settimana: 'Ore-sett.', mese: 'Ore-mese', analisi: 'Ore' }[tipo]
   // settimana ideale vs reale: nelle viste Giorno, Settimana e Periodo
   const aderenza =
-    tipo === 'mese' ? null : aderenzaIdeale(stato.impostazioni?.settimana_ideale, dati.righe, p.da, p.a, adesso)
+    !FASE_2_ATTIVA || tipo === 'mese' ? null : aderenzaIdeale(stato.impostazioni?.settimana_ideale, dati.righe, p.da, p.a, adesso)
   const svr = tipo === 'mese' ? stimaVsReale(r.righe, fattore) : null
   const deleg = delegabili(dati.righe, stato.categorie)
   const matrice = matriceUrgenteImportante(dati.righe, stato.categorie)
@@ -476,10 +477,10 @@ function Delegabili({ deleg, r, valoreOra }) {
             </table>
           )}
           <p className="piccolo">
-            Hai risposto a "Potevi delegarla?" per {ore(deleg.minutiConRisposta)} h su{' '}
+            Attività piazzate sulla mappa: {ore(deleg.minutiConRisposta)} h su{' '}
             {ore(deleg.minutiLavoro)} h di lavoro
             {deleg.minutiConRisposta < deleg.minutiLavoro * 0.5 &&
-              ': rispondi più spesso (+ Dettagli dopo la registrazione) per un dato più affidabile'}
+              ': piazza più spesso le attività sulla mappa dopo la registrazione, per un dato più affidabile'}
             .
           </p>
         </>

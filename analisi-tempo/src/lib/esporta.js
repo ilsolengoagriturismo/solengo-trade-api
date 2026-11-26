@@ -189,7 +189,7 @@ export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, m
   if (deleg?.minutiLavoro) {
     note.push(
       `Ore delegabili: ${ore(deleg.minutiDelegabili)} h (${percento(deleg.percentuale)} del lavoro). ` +
-        `Domanda "potevi delegarla?" compilata per ${ore(deleg.minutiConRisposta)} h su ${ore(deleg.minutiLavoro)} h.`,
+        `Piazzate sulla mappa: ${ore(deleg.minutiConRisposta)} h su ${ore(deleg.minutiLavoro)} h.`,
     )
   }
   if (matrice?.conRisposta) {

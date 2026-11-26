@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase.js'
 import * as archivio from '../lib/archivio.js'
 import { usaArchivio } from '../lib/usaArchivio.js'
 import { vaiA } from '../lib/navigazione.js'
+import { FASE_2_ATTIVA } from '../lib/fasi.js'
 import { dimenticaChiave } from '../lib/accessoDiretto.js'
 
 const GIORNI = [
@@ -53,7 +54,8 @@ export default function Impostazioni({ utente }) {
 
       <Obiettivo stato={stato} utente={utente} esegui={esegui} />
       <Fascia stato={stato} utente={utente} esegui={esegui} />
-      <SettimanaIdeale stato={stato} utente={utente} esegui={esegui} />
+      {/* fase 2: si attiva dopo il mese di misurazione (lib/fasi.js) */}
+      {FASE_2_ATTIVA && <SettimanaIdeale stato={stato} utente={utente} esegui={esegui} />}
       <PeriodoAnalisi stato={stato} utente={utente} esegui={esegui} />
       <Categorie stato={stato} esegui={esegui} />
 
