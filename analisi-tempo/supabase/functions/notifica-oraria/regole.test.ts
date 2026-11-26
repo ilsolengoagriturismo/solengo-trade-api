@@ -55,3 +55,20 @@ describe('notifiche orarie', () => {
     expect(testoNotifica(23).titolo).toBe('23:00 – 00:00')
   })
 })
+
+describe('fascia 5–24', () => {
+  const f524 = Object.fromEntries(
+    [0, 1, 2, 3, 4, 5, 6].map((g) => [String(g), { attivo: true, inizio: 5, fine: 24 }]),
+  )
+  const imp = { ...base, fascia: f524 }
+  it('prima notifica alle 6:00, ultima a mezzanotte (per l\'ora 23–24)', () => {
+    expect(deveNotificare(imp, alle('2026-11-26T04:00:00Z'))).toBe(false) // 5:00 Roma → ora 4–5
+    expect(deveNotificare(imp, alle('2026-11-26T05:00:00Z'))).toBe(true) // 6:00 Roma → ora 5–6
+    expect(deveNotificare(imp, alle('2026-11-26T23:00:00Z'))).toBe(true) // 00:00 Roma → ora 23–24
+    expect(deveNotificare(imp, alle('2026-11-27T00:00:00Z'))).toBe(false) // 01:00 Roma
+  })
+  it('la pausa di oggi vale anche per la notifica di mezzanotte', () => {
+    const pausa = { ...imp, notifiche_pausa_il: '2026-11-26' }
+    expect(deveNotificare(pausa, alle('2026-11-26T23:00:00Z'))).toBe(false)
+  })
+})

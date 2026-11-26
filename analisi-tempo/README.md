@@ -120,7 +120,7 @@ In **Authentication**:
 2. Scrivi la tua email → **Mandami il link di accesso**.
 3. Apri la mail, copia il **codice** e scrivilo nell'app → **Entra**.
 
-Al primo accesso l'app crea da sola le 9 categorie e la fascia 8:00–23:00.
+Al primo accesso l'app crea da sola le 9 categorie e la fascia 5:00–24:00 (migrazione 0005; prima era 8:00–23:00).
 
 ---
 
