@@ -10,8 +10,9 @@
 //  • Se mancano più ore, le propone una dopo l'altra, con l'opzione
 //    "stessa attività per tutte".
 //  • Dopo il salvataggio compare un riquadro (facoltativo) per:
-//    sottocategoria, delegabile, urgente, importante, in linea con
-//    l'obiettivo (1-5), energia, nota. E "Annulla".
+//    la MAPPA A TOCCO (orizzontale = urgenza, verticale = in linea con
+//    l'obiettivo; delegabile = riquadro in basso a destra), sottocategoria,
+//    energia, nota. E "Annulla".
 // =====================================================================
 import { useEffect, useMemo, useState } from 'react'
 import * as archivio from '../lib/archivio.js'
@@ -24,7 +25,7 @@ import {
   chiaveOra,
 } from '../lib/ore.js'
 import { Pillole, OPZIONI_ENERGIA } from '../componenti/Scelte.jsx'
-import DomandeAttivita from '../componenti/DomandeAttivita.jsx'
+import MappaTocco from '../componenti/MappaTocco.jsx'
 import { permesso } from '../lib/notifiche.js'
 import { vaiA } from '../lib/navigazione.js'
 import * as div from '../lib/divisione.js'
@@ -97,6 +98,7 @@ export default function Registra() {
           urgente: v.urgente,
           importante: v.importante,
           allineamento: v.allineamento,
+          urgenza: v.urgenza,
         }),
       ),
     )
@@ -282,6 +284,16 @@ function RiquadroSalvato({ ultimo, setUltimo, stato }) {
     }
   }
 
+  // più campi insieme (dalla mappa) per una sola attività, in tutte le ore salvate
+  function modificaCampi(campi, categoriaId) {
+    for (const ora of ultimo.ore) {
+      archivio.impostaOra(
+        ora,
+        archivio.vociOra(ora).map((v) => (v.categoria_id === categoriaId ? { ...v, ...campi } : v)),
+      )
+    }
+  }
+
   function annulla() {
     for (const ora of ultimo.ore) archivio.impostaOra(ora, ultimo.prima[chiaveOra(ora)])
     setUltimo(null)
@@ -305,7 +317,7 @@ function RiquadroSalvato({ ultimo, setUltimo, stato }) {
 
       {!ultimo.aperto ? (
         <button className="link" onClick={() => setUltimo({ ...ultimo, aperto: true })}>
-          + Dettagli: delegabile, urgente, importante, obiettivo
+          + Mappa: urgenza e obiettivo
         </button>
       ) : (
         <div className="dettagli">
@@ -320,19 +332,7 @@ function RiquadroSalvato({ ultimo, setUltimo, stato }) {
           {stato.impostazioni?.obiettivo && (
             <p className="obiettivo-promemoria">🎯 Obiettivo: {stato.impostazioni.obiettivo}</p>
           )}
-          {voci.length === 1 ? (
-            <DomandeAttivita voce={voci[0]} onCambia={(campo, x) => modifica(campo, x)} />
-          ) : (
-            // più attività nella stessa ora: le domande valgono per ciascuna
-            voci.map((v) => (
-              <DomandeAttivita
-                key={v.id}
-                voce={v}
-                titolo={`${archivio.categoriaPerId(v.categoria_id)?.nome ?? '?'} · ${v.minuti}′`}
-                onCambia={(campo, x) => modifica(campo, x, v.categoria_id)}
-              />
-            ))
-          )}
+          <MappaTocco voci={voci} onPiazza={(v, campi) => modificaCampi(campi, v.categoria_id)} />
           <div className="riga-dettaglio">
             <span>Energia</span>
             <Pillole

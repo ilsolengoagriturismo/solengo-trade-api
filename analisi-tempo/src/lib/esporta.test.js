@@ -8,7 +8,7 @@ it('CSV: una nota con ; e virgolette non sposta le colonne', () => {
     [],
   )
   expect(csv.startsWith('﻿')).toBe(true) // accenti corretti in Excel
-  expect(csv).toContain('03/11/2026;09:00;60;Supervisione;;sì;;;;;"Riunione; ""fornitori"""')
+  expect(csv).toContain('03/11/2026;09:00;60;Supervisione;;sì;;;;;;"Riunione; ""fornitori"""')
 })
 
 it('nome file senza accenti e spazi', () => {

@@ -7,7 +7,7 @@ import * as archivio from '../lib/archivio.js'
 import { usaArchivio } from '../lib/usaArchivio.js'
 import { etichettaOra, etichettaGiorno } from '../lib/ore.js'
 import { Pillole, OPZIONI_ENERGIA } from './Scelte.jsx'
-import DomandeAttivita from './DomandeAttivita.jsx'
+import MappaTocco from './MappaTocco.jsx'
 import { percentualeOra, PASSO } from '../lib/divisione.js'
 
 export default function EditorOra({ ora, onChiudi }) {
@@ -108,7 +108,6 @@ export default function EditorOra({ ora, onChiudi }) {
                   onCambia={(x) => cambia(i, 'sottocategoria_id', x)}
                 />
               )}
-              <DomandeAttivita voce={v} onCambia={(campo, x) => cambia(i, campo, x)} />
               <div className="riga-dettaglio">
                 <span>Energia</span>
                 <Pillole
@@ -132,6 +131,17 @@ export default function EditorOra({ ora, onChiudi }) {
           <button className="secondario largo" onClick={aggiungi}>
             + Aggiungi attività
           </button>
+        )}
+
+        {voci.length > 0 && (
+          <div className="voce">
+            <MappaTocco
+              voci={voci}
+              onPiazza={(voce, campi) =>
+                setVoci((vv) => vv.map((x) => (x.id === voce.id ? { ...x, ...campi } : x)))
+              }
+            />
+          </div>
         )}
 
         <p className={'totale' + (totale > 60 ? ' troppo' : '')}>

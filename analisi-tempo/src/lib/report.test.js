@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   periodo, spostaPeriodo, riepilogo, oreFascia, fattoreProiezione, copertura, ore,
-  stimaVsReale, delegabili, conSegno, matriceUrgenteImportante, allineamentoObiettivo,
+  stimaVsReale, delegabili, conSegno, matriceUrgenteImportante, allineamentoObiettivo, bolleMappa,
 } from './report.js'
 
 const fascia = Object.fromEntries(
@@ -142,5 +142,35 @@ describe('urgente / importante e obiettivo', () => {
   })
   it('nessun voto → media assente', () => {
     expect(allineamentoObiettivo([], cats).media).toBeNull()
+  })
+})
+
+describe('mappa a tocco nel report', () => {
+  const cats = [
+    { id: 'S', lavoro: true },
+    { id: 'T', lavoro: true },
+  ]
+  const righe = [
+    { categoria_id: 'S', minuti: 40, urgenza: 4.5, allineamento: 1.5 },
+    { categoria_id: 'S', minuti: 20, urgenza: 3.0, allineamento: 4.5 },
+    { categoria_id: 'T', minuti: 10, urgenza: 2.0, allineamento: 3.6 },
+    { categoria_id: 'T', minuti: 50 }, // non piazzata
+  ]
+  it('matrice dai valori della mappa (centro 3 = non urgente / non importante)', () => {
+    const m = matriceUrgenteImportante(righe, cats)
+    expect(m).toMatchObject({ fare: 0, pianificare: 30, delegare: 40, eliminare: 0, senzaRisposta: 50 })
+  })
+  it('allineamento con decimali arrotondato per il grafico', () => {
+    const a = allineamentoObiettivo(righe, cats)
+    expect(a.perVoto).toEqual({ 1: 0, 2: 40, 3: 0, 4: 10, 5: 20 })
+    expect(a.media).toBeCloseTo((40 * 1.5 + 20 * 4.5 + 10 * 3.6) / 70)
+  })
+  it('bolle: media pesata per categoria, ordinate dalla più grande', () => {
+    const b = bolleMappa(righe, cats)
+    expect(b.map((x) => x.categoria.id)).toEqual(['S', 'T'])
+    expect(b[0].minuti).toBe(60)
+    expect(b[0].urgenza).toBeCloseTo(4)
+    expect(b[0].allineamento).toBeCloseTo(2.5)
+    expect(b[1].minuti).toBe(10) // solo la parte piazzata
   })
 })

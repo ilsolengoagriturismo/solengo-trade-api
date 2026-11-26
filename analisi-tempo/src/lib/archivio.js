@@ -16,7 +16,7 @@ const GIORNI_IN_MEMORIA = 45
 
 // colonne lette dal database per ogni registrazione
 const CAMPI_REGISTRAZIONE =
-  'id, ora_inizio, minuti, categoria_id, sottocategoria_id, delegabile, energia, nota, urgente, importante, allineamento'
+  'id, ora_inizio, minuti, categoria_id, sottocategoria_id, delegabile, energia, nota, urgente, importante, allineamento, urgenza'
 
 let utenteId = null
 let stato = vuoto()
@@ -119,7 +119,8 @@ export function nuovaVoce(categoriaId, minuti = 60, extra = {}) {
     delegabile: null,
     urgente: null, // sì / no
     importante: null, // sì / no
-    allineamento: null, // 1..5: quanto è in linea con l'obiettivo principale
+    allineamento: null, // 1,0..5,0: quanto è in linea con l'obiettivo (mappa, verticale)
+    urgenza: null, // 1,0..5,0: quanto era urgente (mappa, orizzontale)
     energia: null,
     nota: null,
     ...extra,

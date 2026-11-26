@@ -213,10 +213,13 @@ export function matriceUrgenteImportante(righe, categorie) {
   const m = { fare: 0, pianificare: 0, delegare: 0, eliminare: 0, senzaRisposta: 0 }
   for (const r of righe) {
     if (!lavoro.has(r.categoria_id)) continue
-    if (r.urgente == null || r.importante == null) m.senzaRisposta += r.minuti
-    else if (r.urgente && r.importante) m.fare += r.minuti
-    else if (r.importante) m.pianificare += r.minuti
-    else if (r.urgente) m.delegare += r.minuti
+    // valori della mappa (1..5, centro 3) se ci sono, altrimenti i vecchi sì/no
+    const urgente = r.urgenza != null ? Number(r.urgenza) > 3 : r.urgente
+    const importante = r.urgenza != null && r.allineamento != null ? Number(r.allineamento) > 3 : r.importante
+    if (urgente == null || importante == null) m.senzaRisposta += r.minuti
+    else if (urgente && importante) m.fare += r.minuti
+    else if (importante) m.pianificare += r.minuti
+    else if (urgente) m.delegare += r.minuti
     else m.eliminare += r.minuti
   }
   m.conRisposta = m.fare + m.pianificare + m.delegare + m.eliminare
@@ -237,9 +240,35 @@ export function allineamentoObiettivo(righe, categorie) {
   let somma = 0
   for (const r of righe) {
     if (!lavoro.has(r.categoria_id) || r.allineamento == null) continue
-    perVoto[r.allineamento] += r.minuti
+    const voto = Number(r.allineamento) // può avere un decimale (mappa a tocco)
+    perVoto[Math.min(5, Math.max(1, Math.round(voto)))] += r.minuti
     minuti += r.minuti
-    somma += r.allineamento * r.minuti
+    somma += voto * r.minuti
   }
   return { media: minuti ? somma / minuti : null, minutiConVoto: minuti, perVoto }
+}
+
+// ---- Mappa a bolle ---------------------------------------------------------
+
+/**
+ * Una bolla per categoria: posizione = media (pesata sui minuti) di urgenza
+ * e allineamento delle attività piazzate sulla mappa; grandezza = minuti.
+ */
+export function bolleMappa(righe, categorie) {
+  const perCat = new Map()
+  for (const r of righe) {
+    if (r.urgenza == null || r.allineamento == null) continue
+    const b = perCat.get(r.categoria_id) ?? { minuti: 0, su: 0, sa: 0 }
+    b.minuti += r.minuti
+    b.su += Number(r.urgenza) * r.minuti
+    b.sa += Number(r.allineamento) * r.minuti
+    perCat.set(r.categoria_id, b)
+  }
+  return categorie
+    .filter((c) => perCat.has(c.id))
+    .map((c) => {
+      const b = perCat.get(c.id)
+      return { categoria: c, minuti: b.minuti, urgenza: b.su / b.minuti, allineamento: b.sa / b.minuti }
+    })
+    .sort((x, y) => y.minuti - x.minuti) // le grandi sotto, le piccole sopra
 }

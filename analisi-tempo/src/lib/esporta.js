@@ -45,12 +45,13 @@ export function csvRiepilogo({ titolo, r, svr, fattore }) {
 }
 
 const siNo = (v) => (v == null ? '' : v ? 'sì' : 'no')
+const decimale = (v) => (v == null ? '' : numero(Number(v)))
 
 /** Tutte le registrazioni del periodo, una riga per voce. */
 export function csvDettaglio(righe, categorie, sottocategorie) {
   const nomeCat = new Map(categorie.map((c) => [c.id, c.nome]))
   const nomeSotto = new Map(sottocategorie.map((s) => [s.id, s.nome]))
-  const intest = riga(['Data', 'Ora', 'Minuti', 'Attività', 'Sottocategoria', 'Delegabile', 'Urgente', 'Importante', 'Obiettivo (1-5)', 'Energia (1-3)', 'Nota'])
+  const intest = riga(['Data', 'Ora', 'Minuti', 'Attività', 'Sottocategoria', 'Delegabile', 'Urgente', 'Importante', 'Urgenza (1-5)', 'Obiettivo (1-5)', 'Energia (1-3)', 'Nota'])
   const ordinate = [...righe].sort((a, b) => new Date(a.ora_inizio) - new Date(b.ora_inizio))
   const corpo = ordinate.map((r) => {
     const d = new Date(r.ora_inizio)
@@ -63,7 +64,8 @@ export function csvDettaglio(righe, categorie, sottocategorie) {
       siNo(r.delegabile),
       siNo(r.urgente),
       siNo(r.importante),
-      r.allineamento ?? '',
+      decimale(r.urgenza),
+      decimale(r.allineamento),
       r.energia ?? '',
       r.nota ?? '',
     ])

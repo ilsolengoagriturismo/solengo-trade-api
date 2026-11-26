@@ -20,7 +20,9 @@ import {
   conSegno,
   matriceUrgenteImportante,
   allineamentoObiettivo,
+  bolleMappa,
 } from '../lib/report.js'
+import { posizione } from '../lib/mappa.js'
 import { csvRiepilogo, csvDettaglio, pdfReport, condividiOScarica, nomeFile } from '../lib/esporta.js'
 
 const TIPI = [
@@ -58,6 +60,7 @@ export default function Report() {
   const deleg = delegabili(dati.righe, stato.categorie)
   const matrice = matriceUrgenteImportante(dati.righe, stato.categorie)
   const allin = allineamentoObiettivo(dati.righe, stato.categorie)
+  const bolle = bolleMappa(dati.righe, stato.categorie)
 
   return (
     <div className="report">
@@ -185,6 +188,7 @@ export default function Report() {
 
       {svr && <StimaVsReale svr={svr} stato={stato} />}
       <Delegabili deleg={deleg} r={r} />
+      <MappaBolle bolle={bolle} />
       <UrgenteImportante m={matrice} />
       <Allineamento a={allin} obiettivo={stato.impostazioni?.obiettivo} />
       <Esporta
@@ -382,6 +386,64 @@ function Delegabili({ deleg, r }) {
               ': rispondi più spesso (+ Dettagli dopo la registrazione) per un dato più affidabile'}
             .
           </p>
+        </>
+      )}
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
+// MAPPA A BOLLE: dove sta ogni attività (urgenza × obiettivo)
+// colore = attività, grandezza = ore piazzate sulla mappa
+// ---------------------------------------------------------------------
+function MappaBolle({ bolle }) {
+  const max = Math.max(1, ...bolle.map((b) => b.minuti))
+  return (
+    <section className="sezione-report">
+      <h2>Mappa del tuo tempo</h2>
+      {!bolle.length ? (
+        <p className="piccolo">
+          Ancora nessuna attività piazzata sulla mappa in questo periodo (la mappa compare dopo
+          ogni registrazione).
+        </p>
+      ) : (
+        <>
+          <div className="mappa-cornice">
+            <span className="mappa-asse-y">In linea con l'obiettivo ↑</span>
+            <div className="mappa mappa-report">
+              <span className="q q-pianificare">Pianificare</span>
+              <span className="q q-fare">Fare subito</span>
+              <span className="q q-eliminare">Eliminare</span>
+              <span className="q q-delegare">Delegare</span>
+              {bolle.map((b) => {
+                const p = posizione(b.urgenza, b.allineamento)
+                const lato = 18 + Math.sqrt(b.minuti / max) * 52 // area proporzionale alle ore
+                return (
+                  <span
+                    key={b.categoria.id}
+                    className="bolla"
+                    style={{
+                      left: `${p.sinistra}%`,
+                      top: `${p.alto}%`,
+                      width: lato,
+                      height: lato,
+                      '--colore': b.categoria.colore,
+                    }}
+                    title={`${b.categoria.nome}: ${ore(b.minuti)} h`}
+                  />
+                )
+              })}
+            </div>
+            <span className="mappa-asse-x">Urgenza →</span>
+          </div>
+          <ul className="legenda-bolle">
+            {bolle.map((b) => (
+              <li key={b.categoria.id}>
+                <span className="pallino" style={{ '--colore': b.categoria.colore }} />
+                {b.categoria.nome} <b>{ore(b.minuti)} h</b>
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </section>
