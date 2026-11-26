@@ -272,3 +272,108 @@ export function bolleMappa(righe, categorie) {
     })
     .sort((x, y) => y.minuti - x.minuti) // le grandi sotto, le piccole sopra
 }
+
+// ---- Concentrazione e frammentazione (Cal Newport, Paul Graham) ------------
+
+/**
+ * Guarda ogni ora registrata:
+ *   pulita   = una sola attività in tutta l'ora
+ *   spezzata = 3 o più attività nella stessa ora
+ * e conta i BLOCCHI di lavoro autonomo: 2 o più ore di fila dedicate
+ * (almeno 50′ su 60′) alla categoria 1 "Lavoro autonomo".
+ */
+export function concentrazione(righe, categorie) {
+  const autonomo = new Set(categorie.filter((c) => c.codice === 1).map((c) => c.id))
+  const perOra = new Map()
+  for (const r of righe) {
+    const t = new Date(r.ora_inizio).getTime()
+    const o = perOra.get(t) ?? { attivita: new Set(), autonomo: 0 }
+    o.attivita.add(r.categoria_id)
+    if (autonomo.has(r.categoria_id)) o.autonomo += r.minuti
+    perOra.set(t, o)
+  }
+  let pulite = 0
+  let spezzate = 0
+  for (const o of perOra.values()) {
+    if (o.attivita.size === 1) pulite++
+    if (o.attivita.size >= 3) spezzate++
+  }
+  // blocchi: ore consecutive con almeno 50′ di lavoro autonomo
+  const oreAutonomo = [...perOra.entries()]
+    .filter(([, o]) => o.autonomo >= 50)
+    .map(([t]) => t)
+    .sort((a, b) => a - b)
+  let blocchi = 0
+  let oreInBlocchi = 0
+  let fila = 0
+  for (let i = 0; i <= oreAutonomo.length; i++) {
+    const continua = i > 0 && i < oreAutonomo.length && oreAutonomo[i] - oreAutonomo[i - 1] === 3600000
+    if (i < oreAutonomo.length && (i === 0 || continua)) {
+      fila = continua ? fila + 1 : 1
+      continue
+    }
+    if (fila >= 2) {
+      blocchi++
+      oreInBlocchi += fila
+    }
+    fila = i < oreAutonomo.length ? 1 : 0
+  }
+  return { oreRegistrate: perOra.size, pulite, spezzate, blocchi, oreInBlocchi }
+}
+
+// ---- "In breve": frasi automatiche per il report ---------------------------
+
+const euro = (n) => n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+
+/**
+ * Le 3-4 cose più importanti del periodo, in italiano semplice.
+ * @param dati { r, deleg, matrice, allin, svr, conc, valoreOra }
+ */
+export function frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra }) {
+  const frasi = []
+  if (!r.minutiLavoro) return frasi
+
+  // 1. la voce più grande
+  const top = [...r.righe].filter((x) => x.categoria.lavoro).sort((a, b) => b.minuti - a.minuti)[0]
+  if (top?.minuti) {
+    frasi.push(`La voce più grande è «${top.categoria.nome}»: ${ore(top.minuti)} h, il ${percento(top.percentuale)} del lavoro.`)
+  }
+
+  // 2. lo scostamento maggiore rispetto alla stima (solo mese)
+  const scost = svr?.righe
+    .filter((x) => x.scostamento != null && x.stima)
+    .sort((a, b) => Math.abs(b.scostamento) - Math.abs(a.scostamento))[0]
+  if (scost && Math.abs(scost.scostamentoPct) >= 25) {
+    const parola = svr.usaProiezione ? 'previste a fine mese' : 'reali'
+    frasi.push(
+      `«${scost.categoria.nome}»: ${ore(scost.valore * 60)} h ${parola} contro ${ore(scost.stima * 60)} stimate (${conSegno(scost.scostamento)} h).`,
+    )
+  }
+
+  // 3. tempo da delegare, in ore e in euro
+  // stesso numero della sezione "Ore delegabili" (la mappa segna delegabile il riquadro in basso a destra)
+  const minDelega = deleg?.minutiDelegabili ?? 0
+  if (minDelega >= 30) {
+    let f = `Ore delegabili: ${ore(minDelega)} h (${percento((minDelega / r.minutiLavoro) * 100)} del lavoro).`
+    if (valoreOra) f += ` Al tuo valore di ${euro(valoreOra)}/h sono ${euro((minDelega / 60) * valoreOra)} del tuo tempo.`
+    frasi.push(f)
+  }
+
+  // 4. concentrazione
+  if (conc?.oreRegistrate >= 6) {
+    frasi.push(
+      `Ore senza interruzioni: ${conc.pulite} su ${conc.oreRegistrate}; ore spezzate in 3 o più attività: ${conc.spezzate}. ` +
+        (conc.blocchi
+          ? `Blocchi di lavoro autonomo da 2+ ore: ${conc.blocchi}.`
+          : 'Nessun blocco di lavoro autonomo da 2 ore di fila.'),
+    )
+  }
+
+  // 5. allineamento all'obiettivo
+  if (allin?.media != null && frasi.length < 4) {
+    frasi.push(
+      `In linea con l'obiettivo: media ${allin.media.toLocaleString('it-IT', { maximumFractionDigits: 1 })} su 5.`,
+    )
+  }
+  return frasi.slice(0, 4)
+}

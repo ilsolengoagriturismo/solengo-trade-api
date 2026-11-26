@@ -86,6 +86,8 @@ export default function Impostazioni({ utente }) {
 function Obiettivo({ stato, utente, esegui }) {
   const attuale = stato.impostazioni?.obiettivo ?? ''
   const [testo, setTesto] = useState(attuale)
+  const valoreAttuale = stato.impostazioni?.valore_ora == null ? '' : String(Number(stato.impostazioni.valore_ora))
+  const [valore, setValore] = useState(valoreAttuale)
   return (
     <section className="sezione">
       <h2>🎯 Obiettivo principale</h2>
@@ -106,6 +108,30 @@ function Obiettivo({ stato, utente, esegui }) {
           )
         }
       />
+      <div className="riga-dettaglio">
+        <span>
+          💶 Quanto vale un'ora del tuo tempo?
+          <small className="blocco">Serve a calcolare quanto "costano" le ore delegabili.</small>
+        </span>
+        <span className="campo-euro">
+          <input
+            className="input-corto"
+            inputMode="decimal"
+            placeholder="es. 60"
+            value={valore}
+            onChange={(e) => setValore(e.target.value)}
+            onBlur={() => {
+              const t = valore.trim().replace(',', '.')
+              const v = t === '' ? null : Number(t)
+              if (v != null && (Number.isNaN(v) || v < 0)) return
+              if (t !== valoreAttuale) {
+                esegui(supabase.from('impostazioni').update({ valore_ora: v }).eq('user_id', utente.id))
+              }
+            }}
+          />
+          €/h
+        </span>
+      </div>
     </section>
   )
 }

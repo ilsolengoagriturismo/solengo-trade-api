@@ -21,6 +21,8 @@ import {
   matriceUrgenteImportante,
   allineamentoObiettivo,
   bolleMappa,
+  concentrazione,
+  frasiChiave,
 } from '../lib/report.js'
 import { posizione } from '../lib/mappa.js'
 import { csvRiepilogo, csvDettaglio, pdfReport, condividiOScarica, nomeFile } from '../lib/esporta.js'
@@ -61,6 +63,9 @@ export default function Report() {
   const matrice = matriceUrgenteImportante(dati.righe, stato.categorie)
   const allin = allineamentoObiettivo(dati.righe, stato.categorie)
   const bolle = bolleMappa(dati.righe, stato.categorie)
+  const conc = concentrazione(dati.righe, stato.categorie)
+  const valoreOra = stato.impostazioni?.valore_ora ? Number(stato.impostazioni.valore_ora) : null
+  const frasi = frasiChiave({ r, deleg, matrice, allin, svr, conc, valoreOra })
 
   return (
     <div className="report">
@@ -119,6 +124,17 @@ export default function Report() {
           Hai compilato {cop.compilate} ore su {cop.attese} della tua fascia: i numeri saranno più
           affidabili completando le ore mancanti (schermata Giornata).
         </p>
+      )}
+
+      {frasi.length > 0 && (
+        <section className="in-breve">
+          <h2>In breve</h2>
+          <ul>
+            {frasi.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* --- Tabella nel formato del corso --- */}
@@ -187,7 +203,8 @@ export default function Report() {
       )}
 
       {svr && <StimaVsReale svr={svr} stato={stato} />}
-      <Delegabili deleg={deleg} r={r} />
+      <Delegabili deleg={deleg} r={r} valoreOra={valoreOra} />
+      <Concentrazione c={conc} />
       <MappaBolle bolle={bolle} />
       <UrgenteImportante m={matrice} />
       <Allineamento a={allin} obiettivo={stato.impostazioni?.obiettivo} />
@@ -200,6 +217,7 @@ export default function Report() {
         deleg={deleg}
         matrice={matrice}
         allin={allin}
+        frasi={frasi}
         cop={cop}
         righe={dati.righe}
         stato={stato}
@@ -351,7 +369,7 @@ function ModificaStime({ stato, onChiudi }) {
 // ---------------------------------------------------------------------
 // ORE DELEGABILI
 // ---------------------------------------------------------------------
-function Delegabili({ deleg, r }) {
+function Delegabili({ deleg, r, valoreOra }) {
   const conDelega = r.righe.filter((x) => x.categoria.lavoro && x.minutiDelegabili > 0)
   return (
     <section className="sezione-report">
@@ -363,6 +381,12 @@ function Delegabili({ deleg, r }) {
           <div className="numero-grande">
             {ore(deleg.minutiDelegabili)} h <small>{percento(deleg.percentuale)} del lavoro</small>
           </div>
+          {valoreOra && deleg.minutiDelegabili > 0 && (
+            <p className="valore-euro">
+              ≈ {((deleg.minutiDelegabili / 60) * valoreOra).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}{' '}
+              del tuo tempo (a {valoreOra.toLocaleString('it-IT')} €/h)
+            </p>
+          )}
           {conDelega.length > 0 && (
             <table className="tabella-corso">
               <tbody>
@@ -451,6 +475,37 @@ function MappaBolle({ bolle }) {
 }
 
 // ---------------------------------------------------------------------
+// CONCENTRAZIONE: ore pulite / spezzate, blocchi di lavoro autonomo
+// ---------------------------------------------------------------------
+function Concentrazione({ c }) {
+  if (!c.oreRegistrate) return null
+  return (
+    <section className="sezione-report">
+      <h2>Concentrazione</h2>
+      <div className="riepilogo-giorno">
+        <div>
+          <b>{c.pulite}</b>
+          <small>ore senza interruzioni</small>
+        </div>
+        <div>
+          <b>{c.spezzate}</b>
+          <small>ore spezzate (3+ attività)</small>
+        </div>
+        <div>
+          <b>{c.blocchi}</b>
+          <small>blocchi di lavoro autonomo da 2+ ore</small>
+        </div>
+      </div>
+      <p className="piccolo">
+        Il lavoro di pensiero rende davvero in blocchi lunghi senza interruzioni. Su{' '}
+        {c.oreRegistrate} ore registrate, {percento((c.pulite / c.oreRegistrate) * 100)} sono state
+        dedicate a una sola attività.
+      </p>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
 // URGENTE / IMPORTANTE (matrice di Eisenhower)
 // ---------------------------------------------------------------------
 const QUADRANTI = [
@@ -527,7 +582,7 @@ function Allineamento({ a, obiettivo }) {
 // ---------------------------------------------------------------------
 // EXPORT CSV / PDF
 // ---------------------------------------------------------------------
-function Esporta({ p, tipo, r, svr, fattore, deleg, matrice, allin, cop, righe, stato }) {
+function Esporta({ p, tipo, r, svr, fattore, deleg, matrice, allin, cop, frasi, righe, stato }) {
   const [stato_, setStato] = useState('')
   const nomePeriodo = { giorno: 'Giorno', settimana: 'Settimana', mese: 'Mese' }[tipo]
   const titolo = `${nomePeriodo}: ${p.etichetta}`
@@ -566,6 +621,7 @@ function Esporta({ p, tipo, r, svr, fattore, deleg, matrice, allin, cop, righe, 
                   matrice,
                   allin,
                   cop,
+                  frasi,
                 }),
               nomeFile(p.etichetta, 'pdf'),
             )

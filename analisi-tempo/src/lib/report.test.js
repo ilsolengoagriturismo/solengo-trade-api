@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   periodo, spostaPeriodo, riepilogo, oreFascia, fattoreProiezione, copertura, ore,
   stimaVsReale, delegabili, conSegno, matriceUrgenteImportante, allineamentoObiettivo, bolleMappa,
+  concentrazione, frasiChiave,
 } from './report.js'
 
 const fascia = Object.fromEntries(
@@ -172,5 +173,51 @@ describe('mappa a tocco nel report', () => {
     expect(b[0].urgenza).toBeCloseTo(4)
     expect(b[0].allineamento).toBeCloseTo(2.5)
     expect(b[1].minuti).toBe(10) // solo la parte piazzata
+  })
+})
+
+describe('concentrazione e frasi chiave', () => {
+  const cats = [
+    { id: 'A', codice: 1, nome: 'Lavoro autonomo', lavoro: true, attiva: true, ordine: 1, ore_stimate_mese: 140 },
+    { id: 'T', codice: 2, nome: 'Telefono', lavoro: true, attiva: true, ordine: 2, ore_stimate_mese: 28 },
+    { id: 'S', codice: 4, nome: 'Supervisione', lavoro: true, attiva: true, ordine: 4 },
+  ]
+  const h = (ora) => new Date(2026, 10, 26, ora).toISOString()
+  const righe = [
+    // 8-10 blocco di lavoro autonomo (2 ore pulite di fila)
+    { ora_inizio: h(8), categoria_id: 'A', minuti: 60 },
+    { ora_inizio: h(9), categoria_id: 'A', minuti: 60 },
+    // 10 spezzata in 3
+    { ora_inizio: h(10), categoria_id: 'A', minuti: 20 },
+    { ora_inizio: h(10), categoria_id: 'T', minuti: 20 },
+    { ora_inizio: h(10), categoria_id: 'S', minuti: 20, delegabile: true },
+    // 11 sola supervisione delegabile
+    { ora_inizio: h(11), categoria_id: 'S', minuti: 60, delegabile: true },
+    // 13 un'ora di autonomo isolata: non è un blocco
+    { ora_inizio: h(13), categoria_id: 'A', minuti: 60 },
+    { ora_inizio: h(14), categoria_id: 'T', minuti: 60 },
+  ]
+  it('ore pulite, spezzate e blocchi di lavoro autonomo', () => {
+    expect(concentrazione(righe, cats)).toEqual({ oreRegistrate: 6, pulite: 5, spezzate: 1, blocchi: 1, oreInBlocchi: 2 })
+  })
+  it('due blocchi separati', () => {
+    const due = [8, 9, 12, 13, 14].map((o) => ({ ora_inizio: h(o), categoria_id: 'A', minuti: 60 }))
+    expect(concentrazione(due, cats)).toMatchObject({ blocchi: 2, oreInBlocchi: 5 })
+  })
+  it('frasi: voce principale, delegabili in euro, concentrazione', () => {
+    const r = riepilogo(righe, cats)
+    const f = frasiChiave({
+      r,
+      deleg: delegabili(righe, cats),
+      matrice: matriceUrgenteImportante(righe, cats),
+      allin: allineamentoObiettivo(righe, cats),
+      svr: null,
+      conc: concentrazione(righe, cats),
+      valoreOra: 60,
+    })
+    expect(f[0]).toContain('«Lavoro autonomo»: 3,3 h')
+    expect(f[1]).toContain('Ore delegabili: 1,3 h')
+    expect(f[1]).toContain('80') // 1,33 h × 60 € = 80 €
+    expect(f[2]).toContain('Blocchi di lavoro autonomo da 2+ ore: 1')
   })
 })

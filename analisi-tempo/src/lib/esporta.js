@@ -82,7 +82,7 @@ const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
  * Crea il PDF del report. jsPDF viene caricato solo quando serve, così
  * l'app resta leggera.
  */
-export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, matrice, allin, cop }) {
+export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, matrice, allin, cop, frasi = [] }) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const M = 15 // margine
@@ -109,6 +109,23 @@ export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, m
   testo(sottotitolo, M, y)
   doc.setTextColor(0)
   y += 9
+
+  // --- In breve: le frasi chiave del periodo ---
+  if (frasi.length) {
+    doc.setFont('helvetica', 'bold').setFontSize(11)
+    testo('In breve', M, y)
+    y += 5.5
+    doc.setFont('helvetica', 'normal').setFontSize(9.5)
+    for (const f of frasi) {
+      // «» e … non sono nei font standard del PDF: li sostituisco
+      const pulita = f.replace(/[«»]/g, '"').replace(/…/g, '...')
+      doc.splitTextToSize(`- ${pulita}`, L).forEach((l) => {
+        testo(l, M, y)
+        y += 4.6
+      })
+    }
+    y += 5
+  }
 
   // --- Tabella nel formato del corso ---
   const colonne = [

@@ -418,3 +418,11 @@ small { color: var(--tenue); }
 .legenda-bolle { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: .85rem; }
 .legenda-bolle li { display: flex; align-items: center; gap: 6px; }
 .legenda-bolle .pallino { width: 10px; height: 10px; }
+
+/* ---- Report: in breve, valore in euro ---- */
+.in-breve { margin: 12px 0 16px; padding: 12px 14px; background: var(--carta); border: 1px solid var(--bordo); border-left: 5px solid var(--accento); border-radius: var(--raggio); }
+.in-breve h2 { margin-bottom: 6px; }
+.in-breve ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 6px; }
+.valore-euro { margin: -4px 0 8px; font-weight: 700; color: #b45309; }
+.blocco { display: block; }
+.campo-euro { display: flex; align-items: center; gap: 6px; }
