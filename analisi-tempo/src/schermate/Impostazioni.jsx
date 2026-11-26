@@ -51,6 +51,7 @@ export default function Impostazioni({ utente }) {
         <span className="freccia">›</span>
       </button>
 
+      <Obiettivo stato={stato} utente={utente} esegui={esegui} />
       <Fascia stato={stato} utente={utente} esegui={esegui} />
       <Categorie stato={stato} esegui={esegui} />
 
@@ -76,6 +77,36 @@ export default function Impostazioni({ utente }) {
         )}
       </section>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Obiettivo principale: compare come promemoria quando valuti, da 1 a 5,
+// quanto ogni attività è in linea con l'obiettivo.
+function Obiettivo({ stato, utente, esegui }) {
+  const attuale = stato.impostazioni?.obiettivo ?? ''
+  const [testo, setTesto] = useState(attuale)
+  return (
+    <section className="sezione">
+      <h2>🎯 Obiettivo principale</h2>
+      <p className="piccolo">
+        Per ogni attività potrai dire da 1 a 5 quanto è in linea con questo obiettivo.
+      </p>
+      <textarea
+        className="campo-obiettivo"
+        rows={2}
+        maxLength={200}
+        placeholder="Es. Far crescere il ristorante delegando la gestione quotidiana"
+        value={testo}
+        onChange={(e) => setTesto(e.target.value)}
+        onBlur={() =>
+          testo.trim() !== attuale &&
+          esegui(
+            supabase.from('impostazioni').update({ obiettivo: testo.trim() || null }).eq('user_id', utente.id),
+          )
+        }
+      />
+    </section>
   )
 }
 

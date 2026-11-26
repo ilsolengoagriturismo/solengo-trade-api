@@ -197,3 +197,49 @@ export function delegabili(righe, categorie) {
 /** "+12,5" / "−3" con segno, in ore */
 export const conSegno = (oreNum) =>
   `${oreNum > 0.05 ? '+' : oreNum < -0.05 ? '−' : ''}${Math.abs(oreNum).toLocaleString('it-IT', { maximumFractionDigits: 1 })}`
+
+// ---- Urgente / Importante (matrice di Eisenhower) --------------------------
+
+/**
+ * Minuti di LAVORO nei 4 quadranti. Conta solo le attività dove hai
+ * risposto a entrambe le domande; le altre finiscono in "senzaRisposta".
+ *   fare       = urgente e importante
+ *   pianificare= importante, non urgente   (il quadrante da far crescere)
+ *   delegare   = urgente, non importante
+ *   eliminare  = né urgente né importante
+ */
+export function matriceUrgenteImportante(righe, categorie) {
+  const lavoro = new Set(categorie.filter((c) => c.lavoro).map((c) => c.id))
+  const m = { fare: 0, pianificare: 0, delegare: 0, eliminare: 0, senzaRisposta: 0 }
+  for (const r of righe) {
+    if (!lavoro.has(r.categoria_id)) continue
+    if (r.urgente == null || r.importante == null) m.senzaRisposta += r.minuti
+    else if (r.urgente && r.importante) m.fare += r.minuti
+    else if (r.importante) m.pianificare += r.minuti
+    else if (r.urgente) m.delegare += r.minuti
+    else m.eliminare += r.minuti
+  }
+  m.conRisposta = m.fare + m.pianificare + m.delegare + m.eliminare
+  return m
+}
+
+// ---- Allineamento all'obiettivo principale (1..5) ----------------------------
+
+/**
+ * Media dei voti 1..5 pesata sui minuti (un'ora intera a 5 pesa più di
+ * 10 minuti a 1), solo per le attività di lavoro con un voto.
+ * perVoto[n] = minuti con voto n.
+ */
+export function allineamentoObiettivo(righe, categorie) {
+  const lavoro = new Set(categorie.filter((c) => c.lavoro).map((c) => c.id))
+  const perVoto = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  let minuti = 0
+  let somma = 0
+  for (const r of righe) {
+    if (!lavoro.has(r.categoria_id) || r.allineamento == null) continue
+    perVoto[r.allineamento] += r.minuti
+    minuti += r.minuti
+    somma += r.allineamento * r.minuti
+  }
+  return { media: minuti ? somma / minuti : null, minutiConVoto: minuti, perVoto }
+}

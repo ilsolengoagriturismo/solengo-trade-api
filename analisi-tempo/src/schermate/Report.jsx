@@ -18,6 +18,8 @@ import {
   stimaVsReale,
   delegabili,
   conSegno,
+  matriceUrgenteImportante,
+  allineamentoObiettivo,
 } from '../lib/report.js'
 import { csvRiepilogo, csvDettaglio, pdfReport, condividiOScarica, nomeFile } from '../lib/esporta.js'
 
@@ -54,6 +56,8 @@ export default function Report() {
   const etichettaOre = { giorno: 'Ore', settimana: 'Ore-sett.', mese: 'Ore-mese' }[tipo]
   const svr = tipo === 'mese' ? stimaVsReale(r.righe, fattore) : null
   const deleg = delegabili(dati.righe, stato.categorie)
+  const matrice = matriceUrgenteImportante(dati.righe, stato.categorie)
+  const allin = allineamentoObiettivo(dati.righe, stato.categorie)
 
   return (
     <div className="report">
@@ -181,6 +185,8 @@ export default function Report() {
 
       {svr && <StimaVsReale svr={svr} stato={stato} />}
       <Delegabili deleg={deleg} r={r} />
+      <UrgenteImportante m={matrice} />
+      <Allineamento a={allin} obiettivo={stato.impostazioni?.obiettivo} />
       <Esporta
         p={p}
         tipo={tipo}
@@ -188,6 +194,8 @@ export default function Report() {
         svr={svr}
         fattore={fattore}
         deleg={deleg}
+        matrice={matrice}
+        allin={allin}
         cop={cop}
         righe={dati.righe}
         stato={stato}
@@ -381,9 +389,83 @@ function Delegabili({ deleg, r }) {
 }
 
 // ---------------------------------------------------------------------
+// URGENTE / IMPORTANTE (matrice di Eisenhower)
+// ---------------------------------------------------------------------
+const QUADRANTI = [
+  ['fare', 'Urgente e importante', 'fare subito'],
+  ['pianificare', 'Importante, non urgente', 'da far crescere'],
+  ['delegare', 'Urgente, non importante', 'da delegare'],
+  ['eliminare', 'Né urgente né importante', 'da eliminare'],
+]
+
+function UrgenteImportante({ m }) {
+  const tot = m.conRisposta
+  return (
+    <section className="sezione-report">
+      <h2>Urgente / Importante</h2>
+      {!tot ? (
+        <p className="piccolo">
+          Ancora nessuna attività con entrambe le risposte (Urgente? Importante?) in questo periodo.
+        </p>
+      ) : (
+        <>
+          <div className="matrice">
+            {QUADRANTI.map(([chiave, nome, consiglio]) => (
+              <div key={chiave} className={'quadrante q-' + chiave}>
+                <small>{nome}</small>
+                <b>{ore(m[chiave])} h</b>
+                <span>
+                  {percento((m[chiave] / tot) * 100)} · {consiglio}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="piccolo">
+            Calcolato su {ore(tot)} h di lavoro con entrambe le risposte
+            {m.senzaRisposta > 0 && ` (${ore(m.senzaRisposta)} h senza risposta)`}.
+          </p>
+        </>
+      )}
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
+// ALLINEAMENTO ALL'OBIETTIVO PRINCIPALE (1..5)
+// ---------------------------------------------------------------------
+function Allineamento({ a, obiettivo }) {
+  const max = Math.max(1, ...Object.values(a.perVoto))
+  return (
+    <section className="sezione-report">
+      <h2>In linea con l'obiettivo</h2>
+      {obiettivo && <p className="piccolo">🎯 {obiettivo}</p>}
+      {a.media == null ? (
+        <p className="piccolo">Ancora nessun voto da 1 a 5 in questo periodo.</p>
+      ) : (
+        <>
+          <div className="numero-grande">
+            {a.media.toLocaleString('it-IT', { maximumFractionDigits: 1 })} / 5{' '}
+            <small>media pesata sulle ore ({ore(a.minutiConVoto)} h con voto)</small>
+          </div>
+          <div className="grafico">
+            {[5, 4, 3, 2, 1].map((n) => (
+              <div key={n} className="barra-pista">
+                <span className="voto">{n}</span>
+                <span className="barra voto-barra" style={{ width: `${(a.perVoto[n] / max) * 70}%` }} />
+                <span className="barra-valore">{ore(a.perVoto[n])} h</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------
 // EXPORT CSV / PDF
 // ---------------------------------------------------------------------
-function Esporta({ p, tipo, r, svr, fattore, deleg, cop, righe, stato }) {
+function Esporta({ p, tipo, r, svr, fattore, deleg, matrice, allin, cop, righe, stato }) {
   const [stato_, setStato] = useState('')
   const nomePeriodo = { giorno: 'Giorno', settimana: 'Settimana', mese: 'Mese' }[tipo]
   const titolo = `${nomePeriodo}: ${p.etichetta}`
@@ -419,6 +501,8 @@ function Esporta({ p, tipo, r, svr, fattore, deleg, cop, righe, stato }) {
                   svr: svr && svr.righe.some((x) => x.stima != null) ? svr : null,
                   fattore,
                   deleg,
+                  matrice,
+                  allin,
                   cop,
                 }),
               nomeFile(p.etichetta, 'pdf'),

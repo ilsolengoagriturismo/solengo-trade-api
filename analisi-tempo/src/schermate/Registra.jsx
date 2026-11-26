@@ -10,7 +10,8 @@
 //  • Se mancano più ore, le propone una dopo l'altra, con l'opzione
 //    "stessa attività per tutte".
 //  • Dopo il salvataggio compare un riquadro (facoltativo) per:
-//    sottocategoria, "Potevi delegarla?", energia, nota. E "Annulla".
+//    sottocategoria, delegabile, urgente, importante, in linea con
+//    l'obiettivo (1-5), energia, nota. E "Annulla".
 // =====================================================================
 import { useEffect, useMemo, useState } from 'react'
 import * as archivio from '../lib/archivio.js'
@@ -22,7 +23,8 @@ import {
   etichettaGiorno,
   chiaveOra,
 } from '../lib/ore.js'
-import { Pillole, OPZIONI_DELEGA, OPZIONI_ENERGIA } from '../componenti/Scelte.jsx'
+import { Pillole, OPZIONI_ENERGIA } from '../componenti/Scelte.jsx'
+import DomandeAttivita from '../componenti/DomandeAttivita.jsx'
 import { permesso } from '../lib/notifiche.js'
 import { vaiA } from '../lib/navigazione.js'
 import * as div from '../lib/divisione.js'
@@ -59,7 +61,7 @@ export default function Registra() {
       prima[chiaveOra(ora)] = archivio.vociOra(ora)
       archivio.impostaOra(ora, creaVoci())
     }
-    setUltimo({ ore: oreDaSalvare, prima, aperto: false })
+    setUltimo({ ore: oreDaSalvare, prima, aperto: true })
     setTutteInsieme(false)
     setSelezione([])
     navigator.vibrate?.(25)
@@ -92,6 +94,9 @@ export default function Registra() {
           sottocategoria_id: v.sottocategoria_id,
           delegabile: v.delegabile,
           energia: v.energia,
+          urgente: v.urgente,
+          importante: v.importante,
+          allineamento: v.allineamento,
         }),
       ),
     )
@@ -300,7 +305,7 @@ function RiquadroSalvato({ ultimo, setUltimo, stato }) {
 
       {!ultimo.aperto ? (
         <button className="link" onClick={() => setUltimo({ ...ultimo, aperto: true })}>
-          + Dettagli (facoltativi): delegabile, energia, nota
+          + Dettagli: delegabile, urgente, importante, obiettivo
         </button>
       ) : (
         <div className="dettagli">
@@ -312,32 +317,21 @@ function RiquadroSalvato({ ultimo, setUltimo, stato }) {
               onCambia={(v) => modifica('sottocategoria_id', v)}
             />
           )}
+          {stato.impostazioni?.obiettivo && (
+            <p className="obiettivo-promemoria">🎯 Obiettivo: {stato.impostazioni.obiettivo}</p>
+          )}
           {voci.length === 1 ? (
-            <div className="riga-dettaglio">
-              <span>Potevi delegarla?</span>
-              <Pillole
-                opzioni={OPZIONI_DELEGA}
-                valore={voci[0].delegabile}
-                onCambia={(v) => modifica('delegabile', v)}
-              />
-            </div>
+            <DomandeAttivita voce={voci[0]} onCambia={(campo, x) => modifica(campo, x)} />
           ) : (
-            // più attività nella stessa ora: la domanda vale per ciascuna
-            <div className="delega-per-attivita">
-              <span>Potevi delegarla?</span>
-              {voci.map((v) => (
-                <div key={v.id} className="riga-dettaglio">
-                  <small>
-                    {archivio.categoriaPerId(v.categoria_id)?.nome} {v.minuti}′
-                  </small>
-                  <Pillole
-                    opzioni={OPZIONI_DELEGA}
-                    valore={v.delegabile}
-                    onCambia={(x) => modifica('delegabile', x, v.categoria_id)}
-                  />
-                </div>
-              ))}
-            </div>
+            // più attività nella stessa ora: le domande valgono per ciascuna
+            voci.map((v) => (
+              <DomandeAttivita
+                key={v.id}
+                voce={v}
+                titolo={`${archivio.categoriaPerId(v.categoria_id)?.nome ?? '?'} · ${v.minuti}′`}
+                onCambia={(campo, x) => modifica(campo, x, v.categoria_id)}
+              />
+            ))
           )}
           <div className="riga-dettaglio">
             <span>Energia</span>

@@ -348,3 +348,28 @@ small { color: var(--tenue); }
 .pannello-dividi .dividi-comandi button { min-width: 36px; height: 36px; }
 .pannello-dividi .dividi-comandi .dividi-togli { min-width: 26px; }
 .suggerimento { margin: 10px 0 0; }
+
+/* ---- Domande per attività: delegabile, urgente, importante, obiettivo ---- */
+.domande-attivita { padding: 8px 0; border-top: 1px solid var(--bordo); }
+.domande-titolo { font-weight: 700; font-size: .9rem; margin-bottom: 6px; }
+.domande-griglia { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+.domande-griglia > span { font-size: .88rem; color: var(--tenue); white-space: nowrap; }
+.domande-griglia .pillole { justify-content: flex-end; }
+.domande-griglia .pillole button { min-width: 40px; padding: 6px 10px; }
+.obiettivo-promemoria { margin: 0; font-size: .85rem; color: var(--tenue); }
+.campo-obiettivo { width: 100%; padding: 10px 12px; border: 1px solid var(--bordo); border-radius: 10px; background: var(--carta); font: inherit; font-size: 16px; resize: vertical; }
+
+/* ---- Report: matrice urgente/importante e obiettivo ---- */
+.matrice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.quadrante { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: var(--raggio); background: var(--carta); border: 1px solid var(--bordo); border-left-width: 6px; }
+.quadrante b { font-size: 1.2rem; }
+.quadrante small, .quadrante span { font-size: .8rem; color: var(--tenue); }
+.q-fare { border-left-color: #dc2626; }
+.q-pianificare { border-left-color: #16a34a; }
+.q-delegare { border-left-color: #ea580c; }
+.q-eliminare { border-left-color: #9ca3af; }
+.voto { width: 18px; font-weight: 700; text-align: center; }
+.voto-barra { background: var(--accento); }
+/* i due pulsanti rapidi restano metà schermo ciascuno anche con testi lunghi */
+.azioni-rapide > button { min-width: 0; }
+.azioni-rapide small { display: block; width: 100%; }

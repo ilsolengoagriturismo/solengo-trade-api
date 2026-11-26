@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   periodo, spostaPeriodo, riepilogo, oreFascia, fattoreProiezione, copertura, ore,
-  stimaVsReale, delegabili, conSegno,
+  stimaVsReale, delegabili, conSegno, matriceUrgenteImportante, allineamentoObiettivo,
 } from './report.js'
 
 const fascia = Object.fromEntries(
@@ -114,5 +114,33 @@ describe('stima vs reale', () => {
     expect(conSegno(12.5)).toBe('+12,5')
     expect(conSegno(-3)).toBe('−3')
     expect(conSegno(0)).toBe('0')
+  })
+})
+
+describe('urgente / importante e obiettivo', () => {
+  const cats = [
+    { id: 'A', lavoro: true },
+    { id: 'P', lavoro: false },
+  ]
+  const righe = [
+    { categoria_id: 'A', minuti: 30, urgente: true, importante: true, allineamento: 5 },
+    { categoria_id: 'A', minuti: 20, urgente: false, importante: true, allineamento: 4 },
+    { categoria_id: 'A', minuti: 10, urgente: true, importante: false, allineamento: 1 },
+    { categoria_id: 'A', minuti: 60, urgente: false, importante: false },
+    { categoria_id: 'A', minuti: 40, urgente: true }, // manca "importante"
+    { categoria_id: 'P', minuti: 60, urgente: true, importante: true, allineamento: 5 }, // pausa: esclusa
+  ]
+  it('matrice: 4 quadranti + senza risposta, pausa esclusa', () => {
+    const m = matriceUrgenteImportante(righe, cats)
+    expect(m).toEqual({ fare: 30, pianificare: 20, delegare: 10, eliminare: 60, senzaRisposta: 40, conRisposta: 120 })
+  })
+  it('allineamento: media pesata sui minuti', () => {
+    const a = allineamentoObiettivo(righe, cats)
+    expect(a.minutiConVoto).toBe(60)
+    expect(a.media).toBeCloseTo((30 * 5 + 20 * 4 + 10 * 1) / 60) // 4,0
+    expect(a.perVoto).toEqual({ 1: 10, 2: 0, 3: 0, 4: 20, 5: 30 })
+  })
+  it('nessun voto → media assente', () => {
+    expect(allineamentoObiettivo([], cats).media).toBeNull()
   })
 })

@@ -44,11 +44,13 @@ export function csvRiepilogo({ titolo, r, svr, fattore }) {
   return '﻿' + righe.join('\r\n') + '\r\n'
 }
 
+const siNo = (v) => (v == null ? '' : v ? 'sì' : 'no')
+
 /** Tutte le registrazioni del periodo, una riga per voce. */
 export function csvDettaglio(righe, categorie, sottocategorie) {
   const nomeCat = new Map(categorie.map((c) => [c.id, c.nome]))
   const nomeSotto = new Map(sottocategorie.map((s) => [s.id, s.nome]))
-  const intest = riga(['Data', 'Ora', 'Minuti', 'Attività', 'Sottocategoria', 'Delegabile', 'Energia (1-3)', 'Nota'])
+  const intest = riga(['Data', 'Ora', 'Minuti', 'Attività', 'Sottocategoria', 'Delegabile', 'Urgente', 'Importante', 'Obiettivo (1-5)', 'Energia (1-3)', 'Nota'])
   const ordinate = [...righe].sort((a, b) => new Date(a.ora_inizio) - new Date(b.ora_inizio))
   const corpo = ordinate.map((r) => {
     const d = new Date(r.ora_inizio)
@@ -58,7 +60,10 @@ export function csvDettaglio(righe, categorie, sottocategorie) {
       r.minuti,
       nomeCat.get(r.categoria_id) ?? '',
       nomeSotto.get(r.sottocategoria_id) ?? '',
-      r.delegabile == null ? '' : r.delegabile ? 'sì' : 'no',
+      siNo(r.delegabile),
+      siNo(r.urgente),
+      siNo(r.importante),
+      r.allineamento ?? '',
       r.energia ?? '',
       r.nota ?? '',
     ])
@@ -75,7 +80,7 @@ const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
  * Crea il PDF del report. jsPDF viene caricato solo quando serve, così
  * l'app resta leggera.
  */
-export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, cop }) {
+export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, matrice, allin, cop }) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const M = 15 // margine
@@ -166,6 +171,19 @@ export async function pdfReport({ titolo, sottotitolo, r, svr, fattore, deleg, c
     note.push(
       `Ore delegabili: ${ore(deleg.minutiDelegabili)} h (${percento(deleg.percentuale)} del lavoro). ` +
         `Domanda "potevi delegarla?" compilata per ${ore(deleg.minutiConRisposta)} h su ${ore(deleg.minutiLavoro)} h.`,
+    )
+  }
+  if (matrice?.conRisposta) {
+    const q = (k) => `${ore(matrice[k])} h (${percento((matrice[k] / matrice.conRisposta) * 100)})`
+    note.push(
+      `Urgente/Importante: urgente e importante ${q('fare')}; importante non urgente ${q('pianificare')}; ` +
+        `urgente non importante ${q('delegare')}; né urgente né importante ${q('eliminare')}.`,
+    )
+  }
+  if (allin?.media != null) {
+    note.push(
+      `In linea con l'obiettivo: media ${allin.media.toLocaleString('it-IT', { maximumFractionDigits: 1 })} su 5 ` +
+        `(su ${ore(allin.minutiConVoto)} h con voto).`,
     )
   }
   for (const t of note) {

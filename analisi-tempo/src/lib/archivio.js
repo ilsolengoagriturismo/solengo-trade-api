@@ -14,6 +14,10 @@ import { chiaveOra } from './ore.js'
 
 const GIORNI_IN_MEMORIA = 45
 
+// colonne lette dal database per ogni registrazione
+const CAMPI_REGISTRAZIONE =
+  'id, ora_inizio, minuti, categoria_id, sottocategoria_id, delegabile, energia, nota, urgente, importante, allineamento'
+
 let utenteId = null
 let stato = vuoto()
 let versione = 0
@@ -113,6 +117,9 @@ export function nuovaVoce(categoriaId, minuti = 60, extra = {}) {
     sottocategoria_id: null,
     minuti,
     delegabile: null,
+    urgente: null, // sì / no
+    importante: null, // sì / no
+    allineamento: null, // 1..5: quanto è in linea con l'obiettivo principale
     energia: null,
     nota: null,
     ...extra,
@@ -184,7 +191,7 @@ export async function scaricaRegistrazioni(da, a) {
   if (!supabase) return
   const { data, error } = await supabase
     .from('registrazioni')
-    .select('id, ora_inizio, minuti, categoria_id, sottocategoria_id, delegabile, energia, nota')
+    .select(CAMPI_REGISTRAZIONE)
     .gte('ora_inizio', da.toISOString())
     .lt('ora_inizio', a.toISOString())
     .order('ora_inizio')
@@ -243,7 +250,7 @@ export async function caricaPeriodo(da, a) {
   if (supabase) {
     const { data, error } = await supabase
       .from('registrazioni')
-      .select('id, ora_inizio, minuti, categoria_id, sottocategoria_id, delegabile, energia, nota')
+      .select(CAMPI_REGISTRAZIONE)
       .gte('ora_inizio', da.toISOString())
       .lt('ora_inizio', a.toISOString())
       .order('ora_inizio')

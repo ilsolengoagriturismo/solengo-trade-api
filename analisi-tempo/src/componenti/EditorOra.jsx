@@ -6,7 +6,8 @@ import { useState } from 'react'
 import * as archivio from '../lib/archivio.js'
 import { usaArchivio } from '../lib/usaArchivio.js'
 import { etichettaOra, etichettaGiorno } from '../lib/ore.js'
-import { Pillole, OPZIONI_DELEGA, OPZIONI_ENERGIA } from './Scelte.jsx'
+import { Pillole, OPZIONI_ENERGIA } from './Scelte.jsx'
+import DomandeAttivita from './DomandeAttivita.jsx'
 import { percentualeOra, PASSO } from '../lib/divisione.js'
 
 export default function EditorOra({ ora, onChiudi }) {
@@ -107,14 +108,7 @@ export default function EditorOra({ ora, onChiudi }) {
                   onCambia={(x) => cambia(i, 'sottocategoria_id', x)}
                 />
               )}
-              <div className="riga-dettaglio">
-                <span>Potevi delegarla?</span>
-                <Pillole
-                  opzioni={OPZIONI_DELEGA}
-                  valore={v.delegabile}
-                  onCambia={(x) => cambia(i, 'delegabile', x)}
-                />
-              </div>
+              <DomandeAttivita voce={v} onCambia={(campo, x) => cambia(i, campo, x)} />
               <div className="riga-dettaglio">
                 <span>Energia</span>
                 <Pillole
