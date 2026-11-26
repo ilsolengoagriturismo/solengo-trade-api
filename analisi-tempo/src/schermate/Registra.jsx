@@ -1,8 +1,11 @@
 // =====================================================================
-// REGISTRAZIONE RAPIDA — obiettivo: meno di 5 secondi.
+// REGISTRAZIONE RAPIDA
 //
-//  • Un tocco su una categoria = tutta l'ultima ora a quella categoria.
-//  • "Dividi l'ora": scegli 2-3 categorie e i minuti (15/30/45).
+//  • Ogni tocco su un'attività = 10 minuti (div.PASSO).
+//    Esempio: telefono ×1, supervisione ×3, viaggi ×2 = 60′.
+//  • A 60′ l'ora si salva da sola e si passa all'ora successiva.
+//  • In basso il riepilogo: − / + per correggere, "+N′" completa l'ora,
+//    "Salva così" per salvare un'ora incompleta.
 //  • "Come l'ora precedente": copia l'ultima ora registrata.
 //  • Se mancano più ore, le propone una dopo l'altra, con l'opzione
 //    "stessa attività per tutte".
@@ -42,7 +45,7 @@ export default function Registra() {
   const vociBersaglio = archivio.vociOra(bersaglio)
 
   const [tutteInsieme, setTutteInsieme] = useState(false)
-  const [dividi, setDividi] = useState(false)
+  // minuti assegnati finora all'ora in corso: ogni tocco = +10′
   const [selezione, setSelezione] = useState([]) // [{ categoria_id, minuti }]
   const [ultimo, setUltimo] = useState(null) // ultimo salvataggio, per dettagli e Annulla
 
@@ -58,19 +61,27 @@ export default function Registra() {
     }
     setUltimo({ ore: oreDaSalvare, prima, aperto: false })
     setTutteInsieme(false)
-    setDividi(false)
     setSelezione([])
     navigator.vibrate?.(25)
   }
 
-  function toccaCategoria(c) {
-    if (!dividi) {
-      salva(() => [archivio.nuovaVoce(c.id, 60)])
-      return
+  /**
+   * Aggiorna i minuti dell'ora. Quando si arriva a 60′ l'ora si salva
+   * da sola e si passa alla successiva.
+   */
+  function aggiorna(nuova) {
+    if (div.totale(nuova) === div.ORA) {
+      const voci = div.daSalvare(nuova)
+      salva(() => voci.map((x) => archivio.nuovaVoce(x.categoria_id, x.minuti)))
+    } else {
+      setSelezione(nuova)
     }
-    // modalità "dividi": ogni tocco aggiunge div.PASSO minuti a quell'attività
-    setSelezione((sel) => div.aggiungi(sel, c.id))
+  }
+
+  // ogni tocco aggiunge 10 minuti a quell'attività
+  function toccaCategoria(c) {
     navigator.vibrate?.(10)
+    aggiorna(div.aggiungi(selezione, c.id))
   }
 
   function comePrecedente() {
@@ -90,7 +101,7 @@ export default function Registra() {
   const mancano = div.rimanenti(selezione)
 
   return (
-    <div className={dividi ? 'registra dividendo' : 'registra'}>
+    <div className={selezione.length ? 'registra dividendo' : 'registra'}>
       <InvitoNotifiche />
       {ultimo && <RiquadroSalvato ultimo={ultimo} setUltimo={setUltimo} stato={stato} />}
 
@@ -127,18 +138,11 @@ export default function Registra() {
           ↺ Come l'ora precedente
           {precedente && <small>{nomiVoci(precedente.voci)}</small>}
         </button>
-        <button
-          className={dividi ? 'secondario acceso' : 'secondario'}
-          onClick={() => {
-            // se l'ora è già compilata parto da quello che c'è
-            setSelezione(
-              dividi ? [] : vociBersaglio.map((v) => ({ categoria_id: v.categoria_id, minuti: v.minuti })),
-            )
-            setDividi(!dividi)
-          }}
-        >
-          ½ Dividi l'ora
-          <small>{dividi ? `ogni tocco = +${div.PASSO} min` : `più attività, a ${div.PASSO} min`}</small>
+        <button className="secondario" disabled={!selezione.length} onClick={() => setSelezione([])}>
+          ✕ Ricomincia
+          <small>
+            {selezione.length ? `${totaleDivisione}′ su 60′` : `ogni tocco = ${div.PASSO} min`}
+          </small>
         </button>
       </div>
 
@@ -160,13 +164,14 @@ export default function Registra() {
         })}
       </div>
 
-      {dividi && (
+      {selezione.length === 0 && (
+        <p className="piccolo centrato suggerimento">
+          Ogni tocco = {div.PASSO} minuti. A 60′ l'ora si salva da sola.
+        </p>
+      )}
+
+      {selezione.length > 0 && (
         <div className="pannello-dividi">
-          {selezione.length === 0 && (
-            <p className="piccolo centrato">
-              Tocca le attività che hai fatto in quest'ora: ogni tocco aggiunge {div.PASSO} minuti.
-            </p>
-          )}
           {selezione.map((s) => (
             <div key={s.categoria_id} className="riga-dividi">
               <span className="dividi-nome">
@@ -181,11 +186,11 @@ export default function Registra() {
                   <b>{s.minuti}′</b>
                   <small>{div.percentualeOra(s.minuti)}</small>
                 </span>
-                <button aria-label={`Più ${div.PASSO} minuti`} disabled={!mancano} onClick={() => setSelezione((x) => div.cambia(x, s.categoria_id, div.PASSO))}>
+                <button aria-label={`Più ${div.PASSO} minuti`} disabled={!mancano} onClick={() => aggiorna(div.cambia(selezione, s.categoria_id, div.PASSO))}>
                   +
                 </button>
                 {mancano > 0 && (
-                  <button className="dividi-resto" onClick={() => setSelezione((x) => div.resto(x, s.categoria_id))}>
+                  <button className="dividi-resto" onClick={() => aggiorna(div.resto(selezione, s.categoria_id))}>
                     +{mancano}′
                   </button>
                 )}
@@ -207,11 +212,7 @@ export default function Registra() {
               salva(() => div.daSalvare(selezione).map((s) => archivio.nuovaVoce(s.categoria_id, s.minuti)))
             }
           >
-            {totaleDivisione === 0
-              ? 'Tocca almeno un\'attività'
-              : mancano
-                ? `Salva (${mancano}′ non assegnati)`
-                : 'Salva'}
+            {mancano ? `Salva così (${totaleDivisione}′ su 60′)` : 'Salva'}
           </button>
         </div>
       )}

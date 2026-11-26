@@ -347,3 +347,4 @@ small { color: var(--tenue); }
 .pannello-dividi .dividi-comandi { gap: 4px; flex: none; }
 .pannello-dividi .dividi-comandi button { min-width: 36px; height: 36px; }
 .pannello-dividi .dividi-comandi .dividi-togli { min-width: 26px; }
+.suggerimento { margin: 10px 0 0; }
