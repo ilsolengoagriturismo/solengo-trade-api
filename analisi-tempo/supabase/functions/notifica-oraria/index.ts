@@ -8,7 +8,7 @@
 //  • { "tipo": "prova" }   — dal pulsante "Invia notifica di prova".
 //    Serve il login dell'utente; manda la notifica solo a lui.
 //
-// Segreti da impostare (Edge Functions → Secrets):
+// Segreti (Edge Functions → Secrets), oppure nel Vault (migrazione 0004):
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, CRON_SECRET
 // SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY li fornisce Supabase da solo.
 //
@@ -102,18 +102,31 @@ async function gestisci(req: Request): Promise<Response> {
   const webpush = (await import('npm:web-push@3.6.7')).default
 
   const env = (k: string) => Deno.env.get(k) ?? ''
-  if (!env('VAPID_PUBLIC_KEY') || !env('VAPID_PRIVATE_KEY')) {
-    return risposta({ errore: 'Mancano i segreti VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY' }, 500)
-  }
-  webpush.setVapidDetails(
-    env('VAPID_SUBJECT') || 'mailto:notifiche@example.com',
-    env('VAPID_PUBLIC_KEY'),
-    env('VAPID_PRIVATE_KEY'),
-  )
   // Client "amministratore": legge le impostazioni di tutti gli utenti.
   const admin = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { persistSession: false },
   })
+
+  // Segreti: prima quelli della funzione (Edge Functions → Secrets),
+  // altrimenti quelli nel Vault (migrazione 0004).
+  let vault: Record<string, string> = {}
+  if (!env('VAPID_PRIVATE_KEY') || !env('CRON_SECRET')) {
+    const { data } = await admin.rpc('segreti_notifiche')
+    vault = (data ?? {}) as Record<string, string>
+  }
+  const segreto = (nomeEnv: string, nomeVault: string) => env(nomeEnv) || vault[nomeVault] || ''
+  const vapidPubblica = segreto('VAPID_PUBLIC_KEY', 'vapid_public_key')
+  const vapidPrivata = segreto('VAPID_PRIVATE_KEY', 'vapid_private_key')
+  const segretoCron = segreto('CRON_SECRET', 'segreto_cron')
+
+  if (!vapidPubblica || !vapidPrivata) {
+    return risposta({ errore: 'Mancano le chiavi VAPID (Secrets della funzione o Vault)' }, 500)
+  }
+  webpush.setVapidDetails(
+    segreto('VAPID_SUBJECT', 'vapid_subject') || 'mailto:notifiche@example.com',
+    vapidPubblica,
+    vapidPrivata,
+  )
 
   const corpo = await req.json().catch(() => ({}))
   const adesso = new Date()
@@ -175,7 +188,7 @@ async function gestisci(req: Request): Promise<Response> {
   }
 
   // ---------- Promemoria orario (da pg_cron) ----------
-  if (!env('CRON_SECRET') || req.headers.get('x-cron-secret') !== env('CRON_SECRET')) {
+  if (!segretoCron || req.headers.get('x-cron-secret') !== segretoCron) {
     return risposta({ errore: 'Non autorizzato' }, 401)
   }
 
@@ -207,8 +220,8 @@ async function gestisci(req: Request): Promise<Response> {
       .select('*')
       .eq('user_id', imp.user_id)
     for (const i of iscrizioni ?? []) {
-      // protezione da doppio invio se l'orologio scatta due volte
-      if (i.ultimo_invio && adesso.getTime() - new Date(i.ultimo_invio).getTime() < 20 * 60 * 1000) {
+      // protezione da doppio invio se l'orologio scatta due volte (entro 5 minuti)
+      if (i.ultimo_invio && adesso.getTime() - new Date(i.ultimo_invio).getTime() < 5 * 60 * 1000) {
         continue
       }
       const { titolo, testo } = testoNotifica(o.ora)

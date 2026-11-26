@@ -1,45 +1,23 @@
 // =====================================================================
-// Accesso con link via email.
-// ATTENZIONE iPhone: se l'app è installata sulla Home, il link della mail
-// si apre in Safari, che per Apple è un'app separata. Per questo la mail
-// contiene anche un CODICE da scrivere qui: è il modo affidabile per
-// entrare nell'app installata. (Il README spiega come attivare il codice.)
+// Accesso. Due modi:
+//  1. EMAIL E PASSWORD (consigliato): funziona sempre, anche dall'app
+//     installata sulla Home dell'iPhone, senza aspettare mail.
+//  2. LINK / CODICE VIA EMAIL: comodo da Safari. Se l'app è installata
+//     sulla Home, il link della mail si apre in Safari (che per Apple è
+//     un'app separata): per questo si può scrivere il CODICE della mail,
+//     se il modello della mail lo contiene (README, passo 4).
 // =====================================================================
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
 export default function Login() {
+  const [modo, setModo] = useState('password') // 'password' | 'link'
   const [email, setEmail] = useState(() => localStorage.getItem('analisi-tempo.email') ?? '')
-  const [inviata, setInviata] = useState(false)
-  const [codice, setCodice] = useState('')
-  const [messaggio, setMessaggio] = useState('')
+  const [messaggio, setMessaggio] = useState(null) // { testo, ok }
   const [attesa, setAttesa] = useState(false)
 
-  async function inviaLink(e) {
-    e.preventDefault()
-    setAttesa(true)
-    setMessaggio('')
+  function ricordaEmail() {
     localStorage.setItem('analisi-tempo.email', email.trim())
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: window.location.origin + '/registra' },
-    })
-    setAttesa(false)
-    if (error) setMessaggio(traduci(error.message))
-    else setInviata(true)
-  }
-
-  async function verificaCodice(e) {
-    e.preventDefault()
-    setAttesa(true)
-    setMessaggio('')
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: codice.trim(),
-      type: 'email',
-    })
-    setAttesa(false)
-    if (error) setMessaggio(traduci(error.message))
   }
 
   return (
@@ -47,57 +25,205 @@ export default function Login() {
       <h1>Il mio tempo</h1>
       <p className="sottotitolo">Un'analisi del proprio tempo, un'ora alla volta.</p>
 
-      {!inviata ? (
-        <form onSubmit={inviaLink} className="modulo">
-          <label>
-            La tua email
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <button className="primario" disabled={attesa}>
-            {attesa ? 'Invio…' : 'Mandami il link di accesso'}
-          </button>
-        </form>
+      <div className="schede" role="tablist">
+        <button
+          role="tab"
+          className={modo === 'password' ? 'scelta' : ''}
+          onClick={() => {
+            setModo('password')
+            setMessaggio(null)
+          }}
+        >
+          Email e password
+        </button>
+        <button
+          role="tab"
+          className={modo === 'link' ? 'scelta' : ''}
+          onClick={() => {
+            setModo('link')
+            setMessaggio(null)
+          }}
+        >
+          Link via email
+        </button>
+      </div>
+
+      {modo === 'password' ? (
+        <AccessoPassword
+          email={email}
+          setEmail={setEmail}
+          ricordaEmail={ricordaEmail}
+          attesa={attesa}
+          setAttesa={setAttesa}
+          setMessaggio={setMessaggio}
+        />
       ) : (
-        <form onSubmit={verificaCodice} className="modulo">
-          <p>
-            Ti ho mandato una mail a <b>{email}</b>.
-          </p>
-          <p className="piccolo">
-            Se usi l'app dalla Home dell'iPhone, <b>scrivi qui il codice</b> che trovi nella mail
-            (il link aprirebbe Safari invece dell'app).
-          </p>
-          <label>
-            Codice
-            <input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]*"
-              maxLength={10}
-              value={codice}
-              onChange={(e) => setCodice(e.target.value.replace(/\D/g, ''))}
-            />
-          </label>
-          <button className="primario" disabled={attesa || codice.length < 6}>
-            {attesa ? 'Verifico…' : 'Entra'}
-          </button>
-          <button type="button" className="link" onClick={() => setInviata(false)}>
-            Cambia email o rimanda la mail
-          </button>
-        </form>
+        <AccessoLink
+          email={email}
+          setEmail={setEmail}
+          ricordaEmail={ricordaEmail}
+          attesa={attesa}
+          setAttesa={setAttesa}
+          setMessaggio={setMessaggio}
+        />
       )}
-      {messaggio && <p className="messaggio-errore">{messaggio}</p>}
+
+      {messaggio && (
+        <p className={messaggio.ok ? 'messaggio-ok' : 'messaggio-errore'}>{messaggio.testo}</p>
+      )}
     </div>
   )
 }
 
+function CampoEmail({ email, setEmail }) {
+  return (
+    <label>
+      Email
+      <input
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+    </label>
+  )
+}
+
+// ---------------------------------------------------------------------
+function AccessoPassword({ email, setEmail, ricordaEmail, attesa, setAttesa, setMessaggio }) {
+  const [nuovo, setNuovo] = useState(false) // true = creo l'account
+  const [password, setPassword] = useState('')
+
+  async function invia(e) {
+    e.preventDefault()
+    setAttesa(true)
+    setMessaggio(null)
+    ricordaEmail()
+    if (nuovo) {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { emailRedirectTo: window.location.origin + '/registra' },
+      })
+      setAttesa(false)
+      if (error) return setMessaggio({ testo: traduci(error.message) })
+      if (!data.session) {
+        // il progetto chiede di confermare l'indirizzo
+        setNuovo(false)
+        return setMessaggio({
+          ok: true,
+          testo:
+            'Account creato. Apri la mail di conferma e tocca il link (anche se poi si apre un altro sito va bene): poi torna qui ed entra con email e password.',
+        })
+      }
+      return // sessione attiva: l'app si apre da sola
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    setAttesa(false)
+    if (error) setMessaggio({ testo: traduci(error.message) })
+  }
+
+  return (
+    <form onSubmit={invia} className="modulo">
+      <CampoEmail email={email} setEmail={setEmail} />
+      <label>
+        Password {nuovo && <small>(almeno 8 caratteri)</small>}
+        <input
+          type="password"
+          autoComplete={nuovo ? 'new-password' : 'current-password'}
+          required
+          minLength={nuovo ? 8 : 1}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+      <button className="primario" disabled={attesa}>
+        {attesa ? 'Attendi…' : nuovo ? 'Crea account' : 'Entra'}
+      </button>
+      <button type="button" className="link" onClick={() => setNuovo(!nuovo)}>
+        {nuovo ? 'Ho già un account: entra' : 'Primo accesso? Crea il tuo account'}
+      </button>
+    </form>
+  )
+}
+
+// ---------------------------------------------------------------------
+function AccessoLink({ email, setEmail, ricordaEmail, attesa, setAttesa, setMessaggio }) {
+  const [inviata, setInviata] = useState(false)
+  const [codice, setCodice] = useState('')
+
+  async function inviaLink(e) {
+    e.preventDefault()
+    setAttesa(true)
+    setMessaggio(null)
+    ricordaEmail()
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: window.location.origin + '/registra' },
+    })
+    setAttesa(false)
+    if (error) setMessaggio({ testo: traduci(error.message) })
+    else setInviata(true)
+  }
+
+  async function verificaCodice(e) {
+    e.preventDefault()
+    setAttesa(true)
+    setMessaggio(null)
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: codice.trim(),
+      type: 'email',
+    })
+    setAttesa(false)
+    if (error) setMessaggio({ testo: traduci(error.message) })
+  }
+
+  if (!inviata) {
+    return (
+      <form onSubmit={inviaLink} className="modulo">
+        <CampoEmail email={email} setEmail={setEmail} />
+        <button className="primario" disabled={attesa}>
+          {attesa ? 'Invio…' : 'Mandami il link di accesso'}
+        </button>
+      </form>
+    )
+  }
+  return (
+    <form onSubmit={verificaCodice} className="modulo">
+      <p>
+        Ti ho mandato una mail a <b>{email}</b>. Tocca il link, oppure scrivi qui il codice se la
+        mail ne contiene uno.
+      </p>
+      <label>
+        Codice
+        <input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="[0-9]*"
+          maxLength={10}
+          value={codice}
+          onChange={(e) => setCodice(e.target.value.replace(/\D/g, ''))}
+        />
+      </label>
+      <button className="primario" disabled={attesa || codice.length < 6}>
+        {attesa ? 'Verifico…' : 'Entra'}
+      </button>
+      <button type="button" className="link" onClick={() => setInviata(false)}>
+        Cambia email o rimanda la mail
+      </button>
+    </form>
+  )
+}
+
 function traduci(m) {
+  if (/invalid login credentials/i.test(m)) return 'Email o password sbagliate.'
+  if (/already registered|already exists/i.test(m)) return 'Esiste già un account con questa email: entra con la tua password.'
+  if (/email not confirmed/i.test(m)) return 'Devi prima confermare l\'email: apri la mail di conferma e tocca il link.'
+  if (/password/i.test(m) && /least|short|weak/i.test(m)) return 'Password troppo corta o semplice: usa almeno 8 caratteri.'
+  if (/signups? not allowed|disabled/i.test(m)) return 'La registrazione di nuovi account è disattivata su questo progetto Supabase.'
   if (/rate limit|seconds/i.test(m)) return 'Troppe richieste: aspetta un minuto e riprova.'
   if (/expired|invalid/i.test(m)) return 'Codice scaduto o sbagliato. Fatti mandare una nuova mail.'
   if (/fetch|network/i.test(m)) return 'Nessuna connessione. Riprova quando c\'è rete.'
