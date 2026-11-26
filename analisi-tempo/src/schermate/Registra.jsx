@@ -22,6 +22,7 @@ import {
 import { Pillole, OPZIONI_DELEGA, OPZIONI_ENERGIA } from '../componenti/Scelte.jsx'
 import { permesso } from '../lib/notifiche.js'
 import { vaiA } from '../lib/navigazione.js'
+import * as div from '../lib/divisione.js'
 
 export default function Registra() {
   const stato = usaArchivio()
@@ -67,16 +68,9 @@ export default function Registra() {
       salva(() => [archivio.nuovaVoce(c.id, 60)])
       return
     }
-    // modalità "dividi": seleziono/deseleziono (max 3)
-    setSelezione((sel) => {
-      const gia = sel.some((s) => s.categoria_id === c.id)
-      const nuova = gia
-        ? sel.filter((s) => s.categoria_id !== c.id)
-        : sel.length < 3
-          ? [...sel, { categoria_id: c.id }]
-          : sel
-      return distribuisci(nuova)
-    })
+    // modalità "dividi": ogni tocco aggiunge 5 minuti a quell'attività
+    setSelezione((sel) => div.aggiungi(sel, c.id))
+    navigator.vibrate?.(10)
   }
 
   function comePrecedente() {
@@ -92,7 +86,8 @@ export default function Registra() {
     )
   }
 
-  const totaleDivisione = selezione.reduce((s, x) => s + x.minuti, 0)
+  const totaleDivisione = div.totale(selezione)
+  const mancano = div.rimanenti(selezione)
 
   return (
     <div className={dividi ? 'registra dividendo' : 'registra'}>
@@ -135,12 +130,15 @@ export default function Registra() {
         <button
           className={dividi ? 'secondario acceso' : 'secondario'}
           onClick={() => {
+            // se l'ora è già compilata parto da quello che c'è
+            setSelezione(
+              dividi ? [] : vociBersaglio.map((v) => ({ categoria_id: v.categoria_id, minuti: v.minuti })),
+            )
             setDividi(!dividi)
-            setSelezione([])
           }}
         >
           ½ Dividi l'ora
-          <small>{dividi ? 'scegli 2 o 3 attività' : '15 / 30 / 45 min'}</small>
+          <small>{dividi ? 'ogni tocco = +5 min' : 'più attività, a 5 min'}</small>
         </button>
       </div>
 
@@ -162,36 +160,58 @@ export default function Registra() {
         })}
       </div>
 
-      {dividi && selezione.length > 0 && (
+      {dividi && (
         <div className="pannello-dividi">
-          {selezione.map((s, i) => (
+          {selezione.length === 0 && (
+            <p className="piccolo centrato">
+              Tocca le attività che hai fatto in quest'ora: ogni tocco aggiunge 5 minuti.
+            </p>
+          )}
+          {selezione.map((s) => (
             <div key={s.categoria_id} className="riga-dividi">
-              <span>{archivio.categoriaPerId(s.categoria_id)?.nome}</span>
-              <div className="pillole">
-                {[15, 30, 45].map((m) => (
-                  <button
-                    key={m}
-                    className={s.minuti === m ? 'scelta' : ''}
-                    onClick={() =>
-                      setSelezione((sel) => sel.map((x, j) => (j === i ? { ...x, minuti: m } : x)))
-                    }
-                  >
-                    {m}′
+              <span className="dividi-nome">
+                <span className="pallino" style={{ '--colore': archivio.categoriaPerId(s.categoria_id)?.colore }} />
+                {archivio.categoriaPerId(s.categoria_id)?.nome}
+              </span>
+              <span className="dividi-comandi">
+                <button aria-label="Meno 5 minuti" onClick={() => setSelezione((x) => div.cambia(x, s.categoria_id, -div.PASSO))}>
+                  −
+                </button>
+                <span className="dividi-valore">
+                  <b>{s.minuti}′</b>
+                  <small>{div.percentualeOra(s.minuti)}</small>
+                </span>
+                <button aria-label="Più 5 minuti" disabled={!mancano} onClick={() => setSelezione((x) => div.cambia(x, s.categoria_id, div.PASSO))}>
+                  +
+                </button>
+                {mancano > 0 && (
+                  <button className="dividi-resto" onClick={() => setSelezione((x) => div.resto(x, s.categoria_id))}>
+                    +{mancano}′
                   </button>
-                ))}
-              </div>
+                )}
+                <button aria-label="Togli" className="dividi-togli" onClick={() => setSelezione((x) => div.rimuovi(x, s.categoria_id))}>
+                  ✕
+                </button>
+              </span>
             </div>
           ))}
+          {selezione.length > 0 && (
+            <div className={'dividi-totale' + (mancano ? ' incompleto' : '')}>
+              {mancano ? `Assegnati ${totaleDivisione}′ · mancano ${mancano}′` : 'Ora completa: 60′ ✓'}
+            </div>
+          )}
           <button
             className="primario"
-            disabled={selezione.length < 2 || totaleDivisione !== 60}
-            onClick={() => salva(() => selezione.map((s) => archivio.nuovaVoce(s.categoria_id, s.minuti)))}
+            disabled={totaleDivisione === 0}
+            onClick={() =>
+              salva(() => div.daSalvare(selezione).map((s) => archivio.nuovaVoce(s.categoria_id, s.minuti)))
+            }
           >
-            {selezione.length < 2
-              ? 'Scegli almeno 2 attività'
-              : totaleDivisione === 60
-                ? 'Salva'
-                : `Totale ${totaleDivisione}′ su 60′`}
+            {totaleDivisione === 0
+              ? 'Tocca almeno un\'attività'
+              : mancano
+                ? `Salva (${mancano}′ non assegnati)`
+                : 'Salva'}
           </button>
         </div>
       )}
@@ -222,13 +242,6 @@ function InvitoNotifiche() {
   )
 }
 
-/** Ripartizione iniziale dei minuti: 2 → 30/30, 3 → 30/15/15. */
-function distribuisci(sel) {
-  const schemi = { 1: [60], 2: [30, 30], 3: [30, 15, 15] }
-  const minuti = schemi[sel.length] ?? []
-  return sel.map((s, i) => ({ ...s, minuti: minuti[i] }))
-}
-
 function nomiVoci(voci) {
   return voci
     .map((v) => {
@@ -251,11 +264,14 @@ function RiquadroSalvato({ ultimo, setUltimo, stato }) {
     : []
 
   // i dettagli valgono per tutte le voci delle ore appena salvate
-  function modifica(campo, valore) {
+  // categoriaId = null → vale per tutte le attività dell'ora
+  function modifica(campo, valore, categoriaId = null) {
     for (const ora of ultimo.ore) {
       archivio.impostaOra(
         ora,
-        archivio.vociOra(ora).map((v) => ({ ...v, [campo]: valore })),
+        archivio
+          .vociOra(ora)
+          .map((v) => (categoriaId && v.categoria_id !== categoriaId ? v : { ...v, [campo]: valore })),
       )
     }
   }
@@ -295,14 +311,33 @@ function RiquadroSalvato({ ultimo, setUltimo, stato }) {
               onCambia={(v) => modifica('sottocategoria_id', v)}
             />
           )}
-          <div className="riga-dettaglio">
-            <span>Potevi delegarla?</span>
-            <Pillole
-              opzioni={OPZIONI_DELEGA}
-              valore={voci[0].delegabile}
-              onCambia={(v) => modifica('delegabile', v)}
-            />
-          </div>
+          {voci.length === 1 ? (
+            <div className="riga-dettaglio">
+              <span>Potevi delegarla?</span>
+              <Pillole
+                opzioni={OPZIONI_DELEGA}
+                valore={voci[0].delegabile}
+                onCambia={(v) => modifica('delegabile', v)}
+              />
+            </div>
+          ) : (
+            // più attività nella stessa ora: la domanda vale per ciascuna
+            <div className="delega-per-attivita">
+              <span>Potevi delegarla?</span>
+              {voci.map((v) => (
+                <div key={v.id} className="riga-dettaglio">
+                  <small>
+                    {archivio.categoriaPerId(v.categoria_id)?.nome} {v.minuti}′
+                  </small>
+                  <Pillole
+                    opzioni={OPZIONI_DELEGA}
+                    valore={v.delegabile}
+                    onCambia={(x) => modifica('delegabile', x, v.categoria_id)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="riga-dettaglio">
             <span>Energia</span>
             <Pillole

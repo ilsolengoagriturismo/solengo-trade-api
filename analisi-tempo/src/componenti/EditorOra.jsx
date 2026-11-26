@@ -6,7 +6,8 @@ import { useState } from 'react'
 import * as archivio from '../lib/archivio.js'
 import { usaArchivio } from '../lib/usaArchivio.js'
 import { etichettaOra, etichettaGiorno } from '../lib/ore.js'
-import { Pillole, OPZIONI_DELEGA, OPZIONI_ENERGIA, OPZIONI_MINUTI } from './Scelte.jsx'
+import { Pillole, OPZIONI_DELEGA, OPZIONI_ENERGIA } from './Scelte.jsx'
+import { percentualeOra } from '../lib/divisione.js'
 
 export default function EditorOra({ ora, onChiudi }) {
   const stato = usaArchivio()
@@ -28,7 +29,7 @@ export default function EditorOra({ ora, onChiudi }) {
   }
 
   function aggiungi() {
-    const resto = Math.max(15, 60 - totale)
+    const resto = Math.max(5, 60 - totale)
     setVoci((vv) => [...vv, archivio.nuovaVoce(categorie[0].id, Math.min(60, resto))])
   }
 
@@ -77,12 +78,27 @@ export default function EditorOra({ ora, onChiudi }) {
                   ✕
                 </button>
               </div>
-              <Pillole
-                etichetta="Minuti"
-                opzioni={OPZIONI_MINUTI}
-                valore={v.minuti}
-                onCambia={(m) => m && cambia(i, 'minuti', m)}
-              />
+              {/* minuti a blocchi di 5, senza superare i 60 dell'ora */}
+              <div className="riga-dettaglio">
+                <span>Minuti</span>
+                <span className="dividi-comandi">
+                  <button aria-label="Meno 5 minuti" disabled={v.minuti <= 5} onClick={() => cambia(i, 'minuti', v.minuti - 5)}>
+                    −
+                  </button>
+                  <span className="dividi-valore">
+                    <b>{v.minuti}′</b>
+                    <small>{percentualeOra(v.minuti)}</small>
+                  </span>
+                  <button aria-label="Più 5 minuti" disabled={totale + 5 > 60} onClick={() => cambia(i, 'minuti', v.minuti + 5)}>
+                    +
+                  </button>
+                  {totale < 60 && (
+                    <button className="dividi-resto" onClick={() => cambia(i, 'minuti', v.minuti + 60 - totale)}>
+                      +{60 - totale}′
+                    </button>
+                  )}
+                </span>
+              </div>
               {sotto.length > 0 && (
                 <Pillole
                   etichetta="Sottocategoria"

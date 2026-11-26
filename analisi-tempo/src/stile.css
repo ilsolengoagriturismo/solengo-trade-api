@@ -170,7 +170,7 @@ small { color: var(--tenue); }
 }
 
 /* spazio sotto la griglia: il pannello dei minuti non copre l'ultimo pulsante */
-.registra.dividendo .griglia-categorie { padding-bottom: 240px; }
+.registra.dividendo .griglia-categorie { padding-bottom: 58dvh; }
 .pannello-dividi {
   position: sticky; bottom: calc(env(safe-area-inset-bottom) + 70px);
   margin-top: 12px; padding: 12px;
@@ -180,7 +180,9 @@ small { color: var(--tenue); }
 }
 .riga-dettaglio, .riga-dividi { display: flex; align-items: center; justify-content: space-between; gap: 8px 10px; flex-wrap: wrap; }
 .pillole { min-width: 0; }
-.foglio, .contenuto { overflow-x: hidden; }
+.foglio { overflow-x: hidden; }
+/* "clip" e non "hidden": hidden impedirebbe al pannello "Dividi l'ora" di restare fisso in basso */
+.contenuto { overflow-x: clip; }
 
 .salvato {
   margin-bottom: 12px; padding: 10px 12px;
@@ -319,3 +321,29 @@ small { color: var(--tenue); }
 .bottoni-export .primario { grid-column: 1 / -1; }
 .input-corto { width: 90px; text-align: right; }
 .riquadro-password { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--bordo); }
+
+/* ---- Dividi l'ora a blocchi di 5 minuti ---- */
+.riga-dividi { padding: 4px 0; border-bottom: 1px solid var(--bordo); }
+.dividi-nome { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.dividi-nome .pallino { width: 12px; height: 12px; }
+.dividi-comandi { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.dividi-comandi button {
+  min-width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--bordo); background: var(--carta); font-size: 1.2rem; font-weight: 700;
+}
+.dividi-comandi .dividi-resto { min-width: auto; padding: 0 8px; font-size: .85rem; color: var(--accento); }
+.dividi-comandi .dividi-togli { min-width: 32px; border: 0; background: none; color: var(--tenue); font-size: 1rem; }
+.dividi-valore { display: flex; flex-direction: column; align-items: center; min-width: 44px; line-height: 1.1; }
+.dividi-valore small { font-size: .72rem; }
+.dividi-totale { text-align: center; font-weight: 700; color: #15803d; }
+.dividi-totale.incompleto { color: #b45309; }
+.pannello-dividi { max-height: 55dvh; overflow-y: auto; }
+.delega-per-attivita { display: flex; flex-direction: column; gap: 6px; }
+/* pannello compatto: una riga per attività */
+.pannello-dividi { gap: 4px; padding: 10px; }
+.pannello-dividi .riga-dividi { flex-wrap: nowrap; gap: 6px; padding: 2px 0; }
+.pannello-dividi .dividi-nome { flex: 1; font-size: .88rem; overflow: hidden; }
+.pannello-dividi .dividi-nome span:last-child, .pannello-dividi .dividi-nome { white-space: nowrap; text-overflow: ellipsis; }
+.pannello-dividi .dividi-comandi { gap: 4px; flex: none; }
+.pannello-dividi .dividi-comandi button { min-width: 36px; height: 36px; }
+.pannello-dividi .dividi-comandi .dividi-togli { min-width: 26px; }
