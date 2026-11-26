@@ -27,20 +27,30 @@ import {
 } from '../lib/report.js'
 import { posizione } from '../lib/mappa.js'
 import { csvRiepilogo, csvDettaglio, pdfReport, condividiOScarica, nomeFile } from '../lib/esporta.js'
+import { aderenzaIdeale, periodoAnalisi, NOMI_GIORNI } from '../lib/settimana.js'
 
 const TIPI = [
   ['giorno', 'Giorno'],
   ['settimana', 'Settimana'],
   ['mese', 'Mese'],
 ]
+// quarta scheda, solo se in Impostazioni c'è il periodo di analisi
+const SCHEDA_PERIODO = ['analisi', 'Periodo']
 
 export default function Report() {
   const stato = usaArchivio()
-  const [tipo, setTipo] = useState(() => sessionStorage.getItem('report.tipo') || 'mese')
+  const [tipoScelto, setTipo] = useState(() => sessionStorage.getItem('report.tipo') || 'mese')
   const [riferimento, setRiferimento] = useState(() => new Date())
   const [dati, setDati] = useState({ righe: [], daTelefono: false, caricato: false })
 
-  const p = useMemo(() => periodo(tipo, riferimento), [tipo, riferimento])
+  // periodo dell'esercizio del corso (Impostazioni → Periodo di analisi)
+  const pAnalisi = periodoAnalisi(stato.impostazioni?.analisi_dal, stato.impostazioni?.analisi_al)
+  const schede = pAnalisi ? [...TIPI, SCHEDA_PERIODO] : TIPI
+  // se il periodo è stato tolto, la scheda "Periodo" torna a "Mese"
+  const tipo = tipoScelto === 'analisi' && !pAnalisi ? 'mese' : tipoScelto
+
+  const pCalendario = useMemo(() => periodo(tipo === 'analisi' ? 'mese' : tipo, riferimento), [tipo, riferimento])
+  const p = tipo === 'analisi' ? pAnalisi : pCalendario
   const adesso = new Date()
   const fascia = stato.impostazioni?.fascia
 
@@ -58,7 +68,10 @@ export default function Report() {
   const cop = copertura(dati.righe, fascia, p.da, p.a, adesso)
   const futuro = p.da > adesso
   const massimo = Math.max(1, ...r.righe.map((x) => x.minuti))
-  const etichettaOre = { giorno: 'Ore', settimana: 'Ore-sett.', mese: 'Ore-mese' }[tipo]
+  const etichettaOre = { giorno: 'Ore', settimana: 'Ore-sett.', mese: 'Ore-mese', analisi: 'Ore' }[tipo]
+  // settimana ideale vs reale: nelle viste Giorno, Settimana e Periodo
+  const aderenza =
+    tipo === 'mese' ? null : aderenzaIdeale(stato.impostazioni?.settimana_ideale, dati.righe, p.da, p.a, adesso)
   const svr = tipo === 'mese' ? stimaVsReale(r.righe, fattore) : null
   const deleg = delegabili(dati.righe, stato.categorie)
   const matrice = matriceUrgenteImportante(dati.righe, stato.categorie)
@@ -72,7 +85,7 @@ export default function Report() {
   return (
     <div className="report">
       <div className="schede" role="tablist">
-        {TIPI.map(([t, testo]) => (
+        {schede.map(([t, testo]) => (
           <button
             key={t}
             role="tab"
@@ -88,19 +101,26 @@ export default function Report() {
         ))}
       </div>
 
-      <div className="navigazione-giorno">
-        <button className="secondario" onClick={() => setRiferimento(spostaPeriodo(tipo, riferimento, -1))}>
-          ‹
-        </button>
-        <b className="etichetta-periodo">{p.etichetta}</b>
-        <button
-          className="secondario"
-          disabled={p.a > adesso}
-          onClick={() => setRiferimento(spostaPeriodo(tipo, riferimento, 1))}
-        >
-          ›
-        </button>
-      </div>
+      {tipo === 'analisi' ? (
+        <div className="testa-periodo">
+          <h1>Report finale per il coach</h1>
+          <p className="piccolo">Periodo di analisi {p.etichetta}</p>
+        </div>
+      ) : (
+        <div className="navigazione-giorno">
+          <button className="secondario" onClick={() => setRiferimento(spostaPeriodo(tipo, riferimento, -1))}>
+            ‹
+          </button>
+          <b className="etichetta-periodo">{p.etichetta}</b>
+          <button
+            className="secondario"
+            disabled={p.a > adesso}
+            onClick={() => setRiferimento(spostaPeriodo(tipo, riferimento, 1))}
+          >
+            ›
+          </button>
+        </div>
+      )}
 
       {dati.daTelefono && (
         <p className="piccolo centrato">Offline: dati presenti sul telefono (ultimi 45 giorni).</p>
@@ -205,6 +225,7 @@ export default function Report() {
       )}
 
       {svr && <StimaVsReale svr={svr} stato={stato} />}
+      {aderenza && <IdealeVsReale a={aderenza} />}
       <Delegabili deleg={deleg} r={r} valoreOra={valoreOra} />
       <Concentrazione c={conc} />
       <OreMigliori e={energia} />
@@ -221,11 +242,59 @@ export default function Report() {
         matrice={matrice}
         allin={allin}
         frasi={frasi}
+        aderenza={aderenza}
         cop={cop}
         righe={dati.righe}
         stato={stato}
       />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// SETTIMANA IDEALE VS REALE (Giorno, Settimana, Periodo)
+// Per ogni blocco pianificato: quanta parte l'hai fatta davvero.
+// ---------------------------------------------------------------------
+const NOME_GIORNO = Object.fromEntries(NOMI_GIORNI)
+
+function IdealeVsReale({ a }) {
+  const due = (h) => `${String(h % 24).padStart(2, '0')}:00`
+  return (
+    <section className="sezione-report">
+      <h2>Settimana ideale vs reale</h2>
+      {a.totale.percentuale == null ? (
+        <p className="piccolo">
+          Nessun blocco della settimana ideale in questo periodo (o non ancora concluso). Disegnala
+          in Impostazioni → Settimana ideale.
+        </p>
+      ) : (
+        <>
+          <div className="numero-grande">
+            {percento(a.totale.percentuale)} <small>aderenza: {ore(a.totale.fatti)} h su {ore(a.totale.pianificati)} h pianificate</small>
+          </div>
+          <table className="tabella-corso">
+            <tbody>
+              {a.blocchi.map((b) => {
+                const c = archivio.categoriaPerId(b.categoria_id)
+                return (
+                  <tr key={`${b.giorno}-${b.indice}`}>
+                    <td>
+                      <span className="pallino" style={{ '--colore': c?.colore }} />
+                      {NOME_GIORNO[b.giorno].slice(0, 3)} {due(b.inizio)}–{due(b.fine)} · {c?.nome ?? '?'}
+                    </td>
+                    <td className="num">
+                      {ore(b.fatti)}/{ore(b.pianificati)} h
+                    </td>
+                    <td className={'num ' + (b.percentuale < 50 ? 'scostato' : '')}>{percento(b.percentuale)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <p className="piccolo">In arancione i blocchi rispettati per meno della metà.</p>
+        </>
+      )}
+    </section>
   )
 }
 
@@ -616,10 +685,12 @@ function Allineamento({ a, obiettivo }) {
 // ---------------------------------------------------------------------
 // EXPORT CSV / PDF
 // ---------------------------------------------------------------------
-function Esporta({ p, tipo, r, svr, fattore, deleg, matrice, allin, cop, frasi, righe, stato }) {
+function Esporta({ p, tipo, r, svr, fattore, deleg, matrice, allin, cop, frasi, aderenza, righe, stato }) {
   const [stato_, setStato] = useState('')
-  const nomePeriodo = { giorno: 'Giorno', settimana: 'Settimana', mese: 'Mese' }[tipo]
-  const titolo = `${nomePeriodo}: ${p.etichetta}`
+  const titolo =
+    tipo === 'analisi'
+      ? `Report finale per il coach - periodo di analisi ${p.etichetta}`
+      : `${{ giorno: 'Giorno', settimana: 'Settimana', mese: 'Mese' }[tipo]}: ${p.etichetta}`
 
   async function esegui(crea, nome, tipoMime) {
     setStato('Preparo il file…')
@@ -656,8 +727,9 @@ function Esporta({ p, tipo, r, svr, fattore, deleg, matrice, allin, cop, frasi, 
                   allin,
                   cop,
                   frasi,
+                  aderenza,
                 }),
-              nomeFile(p.etichetta, 'pdf'),
+              nomeFile(tipo === 'analisi' ? `report finale ${p.etichetta}` : p.etichetta, 'pdf'),
             )
           }
         >

@@ -248,6 +248,18 @@ questo in alto vedi la % di ore compilate.
 **Notifiche** (Impostazioni → 🔔): attiva o disattiva su questo telefono, notifica di prova,
 **pausa notifiche per oggi** (domani ripartono da sole), promemoria orari on/off.
 
+**Settimana ideale** (Impostazioni → 🗓️): per ogni giorno aggiungi i blocchi che vorresti
+avere ogni settimana, ad esempio *lunedì 6–8 Lavoro autonomo* o *martedì 15–16 Supervisione*
+(«+ blocco», poi scegli orari e attività; ✕ per toglierlo). Nel Report, viste **Giorno**,
+**Settimana** e **Periodo**, la sezione **Settimana ideale vs reale** mostra per ogni blocco
+quante delle ore pianificate hai passato davvero su quell'attività, e l'**aderenza** totale.
+Le ore non ancora concluse non contano.
+
+**Periodo di analisi** (Impostazioni → 📋): le date di inizio e fine dell'esercizio del corso.
+Con le due date impostate il Report ha una quarta scheda, **Periodo**, con tutto il report su
+quelle settimane e il titolo **«Report finale per il coach»**, anche nel PDF.
+«Togli il periodo» la fa sparire.
+
 ## Aggiornare il database per le fasi 3 e 4
 
 La Fase 3 non cambia il database. Per la Fase 4 esegui nello **SQL Editor** il file
@@ -261,6 +273,13 @@ stima: 140, 28, 20, 28, 28, 0, 5, 28 = **277 ore al mese**.
 | `20261126000001_schema_iniziale.sql` | 1 |
 | `20261126000002_notifiche.sql` | 2 (prima i due segreti nel Vault, passo 8) |
 | `20261126000003_stime.sql` | 4 |
+| `20261126000004_segreti_vault.sql` | segreti delle notifiche nel Vault |
+| `20261126000005_fascia_5_24.sql` | fascia predefinita 5–24 |
+| `20261126000006_accesso_diretto.sql` | accesso con codice personale |
+| `20261126000007_urgente_importante_obiettivo.sql` | urgente / importante / obiettivo |
+| `20261126000008_mappa_a_tocco.sql` | mappa a tocco |
+| `20261126000009_valore_ora.sql` | valore della tua ora |
+| `20261126000010_settimana_ideale.sql` | settimana ideale e periodo di analisi |
 
 ---
 
@@ -322,6 +341,20 @@ Spunta ogni voce dal telefono:
 - [ ] **CSV riepilogo** → aperto con Numbers/Excel, le colonne sono separate e gli accenti
       corretti.
 - [ ] Modalità aereo → il report mostra lo stesso i dati recenti, con l'avviso "Offline".
+
+## Checklist di prova — Settimana ideale e periodo di analisi
+
+- [ ] Impostazioni → 🗓️ Settimana ideale: lunedì «+ blocco», scelgo 6–8 Lavoro autonomo.
+      Il blocco resta anche dopo aver chiuso e riaperto l'app.
+- [ ] Report → **Settimana**: compare «Settimana ideale vs reale» con il blocco del lunedì,
+      ore fatte / pianificate e la %. Se ho registrato le 6–8 come Lavoro autonomo → 100%.
+- [ ] Un blocco rispettato per meno della metà ha la % in arancione.
+- [ ] Report → **Giorno** di lunedì: compare solo il blocco del lunedì.
+- [ ] Impostazioni → 📋 Periodo di analisi: imposto «Dal» e «Al». Nel Report compare la
+      scheda **Periodo** con il titolo «Report finale per il coach».
+- [ ] Scheda Periodo → **PDF**: il titolo del PDF è «Report finale per il coach – periodo
+      di analisi…» e contiene l'aderenza alla settimana ideale.
+- [ ] «Togli il periodo» → la scheda Periodo sparisce.
 
 ---
 

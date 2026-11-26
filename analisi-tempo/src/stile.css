@@ -431,3 +431,15 @@ small { color: var(--tenue); }
 .barra-energia { width: 100%; border-radius: 4px 4px 0 0; background: var(--bordo); min-height: 3px; }
 .barra-energia.top { background: #16a34a; }
 .colonna-energia small { font-size: .62rem; }
+
+/* ---- Settimana ideale e periodo di analisi ---- */
+.giorno-ideale { border-top: 1px solid var(--bordo); padding: 6px 0; }
+.giorno-ideale-testa { display: flex; align-items: center; justify-content: space-between; }
+.blocco-ideale { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+.blocco-ideale .orari select { padding: 6px; }
+.blocco-categoria { flex: 1; min-width: 0; padding: 6px 8px; }
+.campo-data { width: auto; }
+.testa-periodo { text-align: center; margin-bottom: 12px; }
+.testa-periodo h1 { font-size: 1.3rem; }
+/* le schede si adattano al numero (3 o 4 con "Periodo") */
+.schede { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }

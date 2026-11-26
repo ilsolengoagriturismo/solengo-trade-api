@@ -53,6 +53,8 @@ export default function Impostazioni({ utente }) {
 
       <Obiettivo stato={stato} utente={utente} esegui={esegui} />
       <Fascia stato={stato} utente={utente} esegui={esegui} />
+      <SettimanaIdeale stato={stato} utente={utente} esegui={esegui} />
+      <PeriodoAnalisi stato={stato} utente={utente} esegui={esegui} />
       <Categorie stato={stato} esegui={esegui} />
 
       <section className="sezione">
@@ -137,6 +139,123 @@ function Obiettivo({ stato, utente, esegui }) {
 }
 
 // ---------------------------------------------------------------------
+// Settimana ideale (Hyatt, Vanderkam): i blocchi che vorresti ogni
+// settimana. Il Report confronta la settimana vera con questa.
+function SettimanaIdeale({ stato, utente, esegui }) {
+  const ideale = stato.impostazioni?.settimana_ideale ?? {}
+  const categorie = stato.categorie.filter((c) => c.attiva)
+  const ore = Array.from({ length: 25 }, (_, h) => h)
+
+  function salva(nuova) {
+    esegui(supabase.from('impostazioni').update({ settimana_ideale: nuova }).eq('user_id', utente.id))
+  }
+  function cambia(g, i, campo, valore) {
+    const blocchi = (ideale[g] ?? []).map((b, j) => (j === i ? { ...b, [campo]: valore } : b))
+    const b = blocchi[i]
+    if (b.fine <= b.inizio) return // la fine deve venire dopo l'inizio
+    salva({ ...ideale, [g]: blocchi })
+  }
+  function aggiungi(g) {
+    const ultimo = (ideale[g] ?? []).at(-1)
+    const inizio = ultimo ? Math.min(23, ultimo.fine) : 6
+    const nuovo = { inizio, fine: Math.min(24, inizio + 2), categoria_id: categorie[0]?.id }
+    salva({ ...ideale, [g]: [...(ideale[g] ?? []), nuovo] })
+  }
+  function togli(g, i) {
+    salva({ ...ideale, [g]: (ideale[g] ?? []).filter((_, j) => j !== i) })
+  }
+
+  return (
+    <section className="sezione">
+      <h2>🗓️ Settimana ideale</h2>
+      <p className="piccolo">
+        Disegna i blocchi che vorresti ogni settimana (es. lunedì 6–8 Lavoro autonomo). Nel Report
+        vedrai quanto la settimana vera ci assomiglia.
+      </p>
+      {GIORNI.map(([g, nome]) => (
+        <div key={g} className="giorno-ideale">
+          <div className="giorno-ideale-testa">
+            <b>{nome}</b>
+            <button className="link" onClick={() => aggiungi(g)}>
+              + blocco
+            </button>
+          </div>
+          {(ideale[g] ?? []).map((b, i) => (
+            <div key={i} className="blocco-ideale">
+              <span className="orari">
+                <select value={b.inizio} onChange={(e) => cambia(g, i, 'inizio', +e.target.value)}>
+                  {ore.slice(0, 24).map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+                –
+                <select value={b.fine} onChange={(e) => cambia(g, i, 'fine', +e.target.value)}>
+                  {ore.slice(1).map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <select
+                className="blocco-categoria"
+                value={b.categoria_id}
+                onChange={(e) => cambia(g, i, 'categoria_id', e.target.value)}
+              >
+                {categorie.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+              <button className="link pericolo" aria-label="Togli blocco" onClick={() => togli(g, i)}>
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  )
+}
+
+// Periodo di analisi: le settimane dell'esercizio del corso. Il Report
+// aggiunge la scheda "Periodo" con il report finale per il coach.
+function PeriodoAnalisi({ stato, utente, esegui }) {
+  const dal = stato.impostazioni?.analisi_dal ?? ''
+  const al = stato.impostazioni?.analisi_al ?? ''
+  function salva(campi) {
+    const nuovoDal = campi.analisi_dal !== undefined ? campi.analisi_dal : dal
+    const nuovoAl = campi.analisi_al !== undefined ? campi.analisi_al : al
+    if (nuovoDal && nuovoAl && nuovoAl < nuovoDal) return // la fine non può venire prima dell'inizio
+    esegui(supabase.from('impostazioni').update(campi).eq('user_id', utente.id))
+  }
+  return (
+    <section className="sezione">
+      <h2>📋 Periodo di analisi</h2>
+      <p className="piccolo">
+        Le settimane dell'esercizio del corso. Con le due date impostate, il Report ha la scheda
+        «Periodo» con il report finale da mandare al coach.
+      </p>
+      <div className="riga-dettaglio">
+        <span>Dal</span>
+        <input type="date" className="campo-data" value={dal} onChange={(e) => salva({ analisi_dal: e.target.value || null })} />
+      </div>
+      <div className="riga-dettaglio">
+        <span>Al</span>
+        <input type="date" className="campo-data" value={al} onChange={(e) => salva({ analisi_al: e.target.value || null })} />
+      </div>
+      {(dal || al) && (
+        <button className="link" onClick={() => salva({ analisi_dal: null, analisi_al: null })}>
+          Togli il periodo
+        </button>
+      )}
+    </section>
+  )
+}
+
 function Fascia({ stato, utente, esegui }) {
   const fascia = stato.impostazioni?.fascia ?? {}
   const ore = Array.from({ length: 25 }, (_, h) => h)
