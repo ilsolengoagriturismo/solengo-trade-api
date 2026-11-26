@@ -9,9 +9,10 @@
 // =====================================================================
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import { entraConChiave } from '../lib/accessoDiretto.js'
 
 export default function Login() {
-  const [modo, setModo] = useState('password') // 'password' | 'link'
+  const [modo, setModo] = useState('codice') // 'codice' | 'password' | 'link'
   const [email, setEmail] = useState(() => localStorage.getItem('analisi-tempo.email') ?? '')
   const [messaggio, setMessaggio] = useState(null) // { testo, ok }
   const [attesa, setAttesa] = useState(false)
@@ -28,13 +29,23 @@ export default function Login() {
       <div className="schede" role="tablist">
         <button
           role="tab"
+          className={modo === 'codice' ? 'scelta' : ''}
+          onClick={() => {
+            setModo('codice')
+            setMessaggio(null)
+          }}
+        >
+          Codice personale
+        </button>
+        <button
+          role="tab"
           className={modo === 'password' ? 'scelta' : ''}
           onClick={() => {
             setModo('password')
             setMessaggio(null)
           }}
         >
-          Email e password
+          Password
         </button>
         <button
           role="tab"
@@ -44,11 +55,13 @@ export default function Login() {
             setMessaggio(null)
           }}
         >
-          Link via email
+          Link email
         </button>
       </div>
 
-      {modo === 'password' ? (
+      {modo === 'codice' ? (
+        <AccessoCodice attesa={attesa} setAttesa={setAttesa} setMessaggio={setMessaggio} />
+      ) : modo === 'password' ? (
         <AccessoPassword
           email={email}
           setEmail={setEmail}
@@ -88,6 +101,45 @@ function CampoEmail({ email, setEmail }) {
         onChange={(e) => setEmail(e.target.value)}
       />
     </label>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Codice personale (lo stesso del link personale): niente email.
+function AccessoCodice({ attesa, setAttesa, setMessaggio }) {
+  const [codice, setCodice] = useState('')
+  async function invia(e) {
+    e.preventDefault()
+    setAttesa(true)
+    setMessaggio(null)
+    try {
+      await entraConChiave(codice)
+    } catch (err) {
+      setMessaggio({ testo: err.message })
+    }
+    setAttesa(false)
+  }
+  return (
+    <form onSubmit={invia} className="modulo">
+      <label>
+        Codice personale
+        <input
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="ABCD-EFGH-JKLM-NPQR"
+          value={codice}
+          onChange={(e) => setCodice(e.target.value.toUpperCase())}
+        />
+      </label>
+      <button className="primario" disabled={attesa || codice.replace(/[^A-Z0-9]/g, '').length < 12}>
+        {attesa ? 'Entro…' : 'Entra'}
+      </button>
+      <p className="piccolo">
+        È il codice del tuo link personale. Basta scriverlo una volta per telefono: poi l'app si
+        ricorda di te.
+      </p>
+    </form>
   )
 }
 

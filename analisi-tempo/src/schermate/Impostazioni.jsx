@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase.js'
 import * as archivio from '../lib/archivio.js'
 import { usaArchivio } from '../lib/usaArchivio.js'
 import { vaiA } from '../lib/navigazione.js'
+import { dimenticaChiave } from '../lib/accessoDiretto.js'
 
 const GIORNI = [
   ['1', 'Lunedì'],
@@ -63,7 +64,10 @@ export default function Impostazioni({ utente }) {
             avere rete.
           </p>
         )}
-        <button className="secondario largo" onClick={() => supabase.auth.signOut()}>
+        <button className="secondario largo" onClick={() => {
+            dimenticaChiave() // altrimenti l'app rientrerebbe da sola
+            supabase.auth.signOut()
+          }}>
           Esci
         </button>
       </section>

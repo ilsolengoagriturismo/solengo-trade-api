@@ -4,3 +4,7 @@
 # La funzione controlla da sola chi la chiama (segreto del cron o login
 # dell'utente), quindi il controllo automatico va disattivato.
 verify_jwt = false
+
+[functions.accesso-diretto]
+# controlla da sola il codice personale
+verify_jwt = false

@@ -16,6 +16,7 @@ import Notifiche from './schermate/Notifiche.jsx'
 import Report from './schermate/Report.jsx'
 import GeneraChiavi from './schermate/GeneraChiavi.jsx'
 import { riconfermaIscrizione } from './lib/notifiche.js'
+import { chiaveDaIndirizzo, chiaveSalvata, entraConChiave } from './lib/accessoDiretto.js'
 
 const PAGINE = {
   '/registra': { titolo: 'Registra', icona: '⏱️', Componente: Registra },
@@ -51,7 +52,22 @@ export default function App() {
   // --- login / logout ---
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => setSessione(data.session))
+    ;(async () => {
+      // 1. link personale (…/entra#chiave=…): entro e pulisco l'indirizzo
+      const daLink = chiaveDaIndirizzo()
+      if (daLink) {
+        await entraConChiave(daLink).catch(() => {})
+        window.history.replaceState({}, '', '/registra')
+        setPercorso('/registra')
+      }
+      // 2. sessione scaduta ma chiave ricordata su questo telefono: rientro da solo
+      let { data } = await supabase.auth.getSession()
+      if (!data.session && chiaveSalvata()) {
+        await entraConChiave(chiaveSalvata()).catch(() => {})
+        ;({ data } = await supabase.auth.getSession())
+      }
+      setSessione(data.session)
+    })()
     const { data } = supabase.auth.onAuthStateChange((_evento, s) => setSessione(s))
     return () => data.subscription.unsubscribe()
   }, [])
