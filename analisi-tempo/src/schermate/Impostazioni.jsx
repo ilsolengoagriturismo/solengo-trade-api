@@ -64,12 +64,16 @@ export default function Impostazioni({ utente }) {
             avere rete.
           </p>
         )}
-        <button className="secondario largo" onClick={() => {
+        {import.meta.env.VITE_CHIAVE_PERSONALE ? (
+          <p className="piccolo">Accesso automatico attivo: l'app entra da sola, senza login.</p>
+        ) : (
+          <button className="secondario largo" onClick={() => {
             dimenticaChiave() // altrimenti l'app rientrerebbe da sola
             supabase.auth.signOut()
           }}>
           Esci
         </button>
+        )}
       </section>
     </div>
   )

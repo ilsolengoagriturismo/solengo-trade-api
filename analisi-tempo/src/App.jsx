@@ -62,8 +62,11 @@ export default function App() {
       }
       // 2. sessione scaduta ma chiave ricordata su questo telefono: rientro da solo
       let { data } = await supabase.auth.getSession()
-      if (!data.session && chiaveSalvata()) {
-        await entraConChiave(chiaveSalvata()).catch(() => {})
+      // chiave ricordata su questo telefono, oppure quella "incorporata"
+      // nell'app (VITE_CHIAVE_PERSONALE su Vercel): accesso automatico
+      const chiave = chiaveSalvata() || import.meta.env.VITE_CHIAVE_PERSONALE
+      if (!data.session && chiave) {
+        await entraConChiave(chiave).catch(() => {})
         ;({ data } = await supabase.auth.getSession())
       }
       setSessione(data.session)
